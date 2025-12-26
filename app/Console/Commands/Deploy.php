@@ -34,7 +34,7 @@ class Deploy extends Command
      *
      * @var string
      */
-    protected $gitRepository = 'https://github.com/letoceiling-coder/tma.git';
+    protected $gitRepository = 'https://github.com/letoceiling-coder/aip.git';
 
     /**
      * Execute the console command.
@@ -124,21 +124,23 @@ class Deploy extends Command
         }
 
         // Проверяем наличие собранных файлов
-        $buildDirs = [
-            public_path('build'), // Vue админка
-            public_path('frontend'), // React приложение
-        ];
-
-        $allExist = true;
-        foreach ($buildDirs as $dir) {
-            if (!File::exists($dir)) {
-                $this->warn("  ⚠️  Директория {$dir} не найдена после сборки");
-                $allExist = false;
-            }
+        // Vue админка - обязательна
+        $buildDir = public_path('build');
+        if (!File::exists($buildDir)) {
+            throw new \Exception("Директория {$buildDir} (Vue админка) не найдена после сборки");
         }
 
-        if (!$allExist) {
-            throw new \Exception('Одна или несколько директорий сборки не найдены после сборки');
+        // React приложение - проверяем только если директория существует и не пустая
+        $frontendDir = public_path('frontend');
+        if (File::exists($frontendDir)) {
+            $frontendFiles = File::allFiles($frontendDir);
+            if (empty($frontendFiles)) {
+                $this->line('  ℹ️  Директория public/frontend пустая, пропускаем проверку для React приложения');
+            } else {
+                $this->line('  ✅ React приложение собрано в public/frontend');
+            }
+        } else {
+            $this->line('  ℹ️  Директория public/frontend не существует, пропускаем проверку для React приложения');
         }
 
         $this->info('  ✅ Сборка завершена успешно');

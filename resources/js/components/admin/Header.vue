@@ -11,9 +11,28 @@
                 </svg>
             </button>
             <div class="hidden sm:flex items-center gap-2 text-sm min-w-0">
-                <span class="text-muted-foreground truncate">Панель управления</span>
-                <span class="text-muted-foreground">/</span>
-                <span class="font-semibold text-foreground truncate">{{ currentPageTitle }}</span>
+                <template v-if="breadcrumbs.length > 0">
+                    <template v-for="(crumb, index) in breadcrumbs" :key="index">
+                        <span 
+                            v-if="index > 0"
+                            class="text-muted-foreground"
+                        >/</span>
+                        <span 
+                            :class="[
+                                'truncate',
+                                index === breadcrumbs.length - 1 
+                                    ? 'font-semibold text-foreground' 
+                                    : 'text-muted-foreground hover:text-foreground cursor-pointer'
+                            ]"
+                            @click="index < breadcrumbs.length - 1 && navigateToCrumb(crumb)"
+                        >
+                            {{ crumb.title }}
+                        </span>
+                    </template>
+                </template>
+                <template v-else>
+                    <span class="font-semibold text-foreground truncate">{{ currentPageTitle }}</span>
+                </template>
             </div>
             <div class="flex sm:hidden items-center text-sm min-w-0">
                 <span class="font-semibold text-foreground truncate">{{ currentPageTitle }}</span>
@@ -58,7 +77,7 @@
 <script>
 import { computed, inject } from 'vue';
 import { useStore } from 'vuex';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import NotificationDropdown from './NotificationDropdown.vue';
 
 export default {
@@ -69,6 +88,7 @@ export default {
     setup() {
         const store = useStore();
         const route = useRoute();
+        const router = useRouter();
         const mobileMenu = inject('mobileMenu', null);
         
         const user = computed(() => store.getters.user);
@@ -78,9 +98,58 @@ export default {
             const names = user.value.name.split(' ');
             return names.map(n => n[0]).join('').toUpperCase().substring(0, 2);
         });
+        
+        // Формирование хлебных крошек
+        const breadcrumbs = computed(() => {
+            const crumbs = [];
+            
+            // Если это главная страница, показываем только "Панель управления"
+            if (route.name === 'admin.dashboard') {
+                return [];
+            }
+            
+            // Для всех остальных страниц добавляем "Панель управления" как первый элемент
+            crumbs.push({
+                title: 'Панель управления',
+                name: 'admin.dashboard',
+                path: '/',
+            });
+            
+            // Если есть родительский маршрут в meta (например, для тикета поддержки)
+            if (route.meta?.parent) {
+                const parentRoute = router.resolve({ name: route.meta.parent });
+                if (parentRoute.name) {
+                    crumbs.push({
+                        title: parentRoute.meta?.title || parentRoute.name,
+                        name: parentRoute.name,
+                        path: parentRoute.path,
+                    });
+                }
+            }
+            
+            // Добавляем текущую страницу
+            if (route.meta?.title) {
+                crumbs.push({
+                    title: route.meta.title,
+                    name: route.name,
+                    path: route.path,
+                });
+            }
+            
+            return crumbs;
+        });
+        
         const currentPageTitle = computed(() => {
             return route.meta?.title || 'Панель управления';
         });
+
+        const navigateToCrumb = (crumb) => {
+            if (crumb.name) {
+                router.push({ name: crumb.name });
+            } else if (crumb.path) {
+                router.push(crumb.path);
+            }
+        };
 
         const toggleTheme = () => {
             store.dispatch('toggleTheme');
@@ -96,9 +165,11 @@ export default {
             user,
             userInitials,
             currentPageTitle,
+            breadcrumbs,
             isDarkMode,
             toggleTheme,
             toggleMobileMenu,
+            navigateToCrumb,
         };
     },
 };

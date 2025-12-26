@@ -398,26 +398,9 @@ class DeployController extends Controller
             }
             Log::info("🔍 HOME директория: {$homeDir}");
 
-            // Формируем команду в зависимости от того, найден ли полный путь к composer
-            if (empty($composerPath) || $composerPath === 'composer') {
-                // Если путь не найден или это просто 'composer', используем composer как команду напрямую
-                $command = "composer install --no-dev --optimize-autoloader --no-interaction --no-scripts";
-            } else {
-                // Если найден полный путь, используем composer напрямую или через sudo -u для правильного пользователя
-                $escapedPath = escapeshellarg($composerPath);
-                
-                // Пробуем запустить composer напрямую (может работать, если права позволяют)
-                // Если это не сработает, нужно будет использовать sudo -u dsc23ytp
-                // Но сначала пробуем просто composer как команду (он может быть в PATH)
-                $command = "composer install --no-dev --optimize-autoloader --no-interaction --no-scripts";
-                
-                // Если путь содержит полный путь к composer, пробуем его использовать через PHP
-                // или напрямую, если это исполняемый файл
-                if (strpos($composerPath, '/') !== false) {
-                    // Это полный путь, используем PHP для его выполнения
-                    $command = "{$this->phpPath} {$escapedPath} install --no-dev --optimize-autoloader --no-interaction --no-scripts";
-                }
-            }
+            // Формируем команду: всегда используем просто 'composer', так как директория добавляется в PATH
+            // Это обходит проблемы с правами доступа при чтении файла напрямую
+            $command = "composer install --no-dev --optimize-autoloader --no-interaction --no-scripts";
             Log::info("🔍 Команда composer: {$command}");
 
             // Подготавливаем переменные окружения
@@ -428,10 +411,12 @@ class DeployController extends Controller
             ];
             
             // Если composer найден по полному пути, добавляем его директорию в PATH
-            if (!empty($composerPath) && $composerPath !== 'composer') {
+            // Это позволит использовать просто команду 'composer' вместо полного пути
+            if (!empty($composerPath) && $composerPath !== 'composer' && strpos($composerPath, '/') !== false) {
                 $composerDir = dirname($composerPath);
                 $currentPath = getenv('PATH') ?: '/usr/local/bin:/usr/bin:/bin';
                 $env['PATH'] = $composerDir . ':' . $currentPath;
+                Log::info("🔍 Добавлена директория composer в PATH: {$composerDir}");
             }
             
             $process = Process::path($this->basePath)

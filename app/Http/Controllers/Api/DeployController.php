@@ -397,13 +397,13 @@ class DeployController extends Controller
             Log::info("🔍 HOME директория: {$homeDir}");
 
             // Формируем команду
-            // На Beget веб-сервер не может выполнить composer напрямую из-за прав доступа
-            // Используем PHP для выполнения composer скрипта по полному пути
+            // На Beget веб-сервер не может прочитать файл composer напрямую из-за прав доступа
+            // Используем cat для чтения файла и передачу в PHP (обходит проблемы с правами на чтение)
             if (!empty($composerPath) && $composerPath !== 'composer' && strpos($composerPath, '/') !== false) {
-                // Используем полный путь к composer через PHP
+                // Используем cat для чтения файла и передачу в PHP через stdin
                 $escapedPath = escapeshellarg($composerPath);
-                $command = "{$this->phpPath} {$escapedPath} install --no-dev --optimize-autoloader --no-interaction --no-scripts 2>&1";
-                Log::info("🔍 Используем PHP для выполнения composer: {$this->phpPath} {$escapedPath}");
+                $command = "cat {$escapedPath} | {$this->phpPath} - install --no-dev --optimize-autoloader --no-interaction --no-scripts 2>&1";
+                Log::info("🔍 Используем cat + PHP для выполнения composer: cat {$escapedPath} | {$this->phpPath}");
             } else {
                 // Если путь не найден, пробуем команду composer (может не сработать из-за прав)
                 $command = "composer install --no-dev --optimize-autoloader --no-interaction --no-scripts 2>&1";

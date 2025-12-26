@@ -264,7 +264,10 @@ const routes = [
             {
                 path: 'bots',
                 name: 'admin.bots',
-                component: () => import('./pages/admin/Bots.vue'),
+                component: () => import('./pages/admin/Bots.vue').catch(err => {
+                    console.error('Error loading Bots component:', err);
+                    return { default: { template: '<div>Ошибка загрузки компонента Боты</div>' } };
+                }),
                 meta: { requiresAuth: true, requiresRole: ['admin'], title: 'Боты' },
             },
         ],

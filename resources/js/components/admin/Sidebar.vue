@@ -39,7 +39,7 @@
             </div>
             <template v-else v-for="item in menu" :key="item.route || item.title">
                 <router-link
-                    v-if="!item.children"
+                    v-if="!item.children && item.route"
                     :to="{ name: item.route }"
                     @click="handleMobileMenuClick"
                     class="nav-menu-item flex items-center rounded-xl text-sm font-medium transition-all text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground px-4 py-3 gap-3"

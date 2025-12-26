@@ -67,6 +67,13 @@ class DeployController extends Controller
                 throw new \Exception("Ошибка git pull: {$gitPullResult['error']}");
             }
 
+            // 1.5. Проверка наличия собранных файлов фронтенда
+            $frontendCheck = $this->checkFrontendFiles();
+            $result['data']['frontend_files'] = $frontendCheck;
+            if (!$frontendCheck['manifest_exists']) {
+                Log::warning('⚠️ Manifest.json не найден после git pull. Убедитесь, что файлы собраны локально и закоммичены в git.');
+            }
+
             // 2. Composer install
             $composerResult = $this->handleComposerInstall();
             $result['data']['composer_install'] = $composerResult['status'];
@@ -893,6 +900,30 @@ class DeployController extends Controller
         return [
             'success' => !in_array(false, $results, true),
             'details' => $results,
+        ];
+    }
+
+    /**
+     * Проверить наличие файлов фронтенда
+     */
+    protected function checkFrontendFiles(): array
+    {
+        $manifestPath = public_path('build/manifest.json');
+        $manifestExists = file_exists($manifestPath);
+        
+        $assetsDir = public_path('build/assets');
+        $assetsExists = is_dir($assetsDir);
+        $assetsCount = 0;
+        
+        if ($assetsExists) {
+            $files = glob($assetsDir . '/*.{js,css}', GLOB_BRACE);
+            $assetsCount = $files ? count($files) : 0;
+        }
+        
+        return [
+            'manifest_exists' => $manifestExists,
+            'assets_dir_exists' => $assetsExists,
+            'assets_count' => $assetsCount,
         ];
     }
 

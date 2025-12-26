@@ -100,3 +100,8 @@ Route::get('/logs', [\App\Http\Controllers\LogController::class, 'getLogs']);
 Route::get('/logs/files', [\App\Http\Controllers\LogController::class, 'getLogFilesList']);
 Route::post('/logs/clear', [\App\Http\Controllers\LogController::class, 'clearLogs']);
 
+// Telegram webhook (публичный роут, Telegram отправляет POST запросы)
+Route::post('/telegram/webhook/{id}', [BotController::class, 'handleWebhook'])
+    ->where('id', '[0-9]+')
+    ->name('telegram.webhook');
+

@@ -60,50 +60,55 @@ class BotController extends Controller
                 ], 400);
             }
 
-            // Формируем webhook URL
-            $webhookUrl = url('/api/telegram/webhook/' . $request->token);
-
-            // Настройки webhook из запроса или дефолтные
-            $allowedUpdates = $request->input('webhook.allowed_updates');
-            if (is_string($allowedUpdates)) {
-                $allowedUpdates = array_map('trim', explode(',', $allowedUpdates));
-            }
-            
-            $webhookOptions = [
-                'allowed_updates' => $allowedUpdates ?: config('telegram.webhook.allowed_updates', ['message', 'callback_query']),
-                'max_connections' => $request->input('webhook.max_connections', config('telegram.webhook.max_connections', 40)),
-            ];
-
-            if ($request->has('webhook.secret_token') && $request->input('webhook.secret_token')) {
-                $webhookOptions['secret_token'] = $request->input('webhook.secret_token');
-            }
-
-            // Регистрируем webhook
-            $webhookResult = $this->telegramService->setWebhook($request->token, $webhookUrl, $webhookOptions);
-
             // Формируем настройки бота
             $settings = $request->settings ?? [];
             if ($request->has('webhook')) {
+                $allowedUpdates = $request->input('webhook.allowed_updates');
+                if (is_string($allowedUpdates)) {
+                    $allowedUpdates = array_map('trim', explode(',', $allowedUpdates));
+                }
+                
                 $settings['webhook'] = [
-                    'allowed_updates' => $webhookOptions['allowed_updates'],
-                    'max_connections' => $webhookOptions['max_connections'],
+                    'allowed_updates' => $allowedUpdates ?: config('telegram.webhook.allowed_updates', ['message', 'callback_query']),
+                    'max_connections' => $request->input('webhook.max_connections', config('telegram.webhook.max_connections', 40)),
                 ];
-                if (isset($webhookOptions['secret_token'])) {
-                    $settings['webhook']['secret_token'] = $webhookOptions['secret_token'];
+                if ($request->has('webhook.secret_token') && $request->input('webhook.secret_token')) {
+                    $settings['webhook']['secret_token'] = $request->input('webhook.secret_token');
                 }
             }
 
-            // Создаем бота
+            // Создаем бота сначала без webhook URL
             $bot = Bot::create([
                 'name' => $request->name,
                 'token' => $request->token,
                 'username' => $botInfo['data']['username'] ?? null,
-                'webhook_url' => $webhookUrl,
-                'webhook_registered' => $webhookResult['success'] ?? false,
+                'webhook_url' => null, // Будет установлен после создания
+                'webhook_registered' => false,
                 'welcome_message' => $request->welcome_message ?? null,
                 'settings' => $settings,
                 'is_active' => true,
             ]);
+
+            // Теперь формируем правильный webhook URL с ID бота
+            $webhookUrl = url('/api/telegram/webhook/' . $bot->id);
+            
+            // Настройки webhook
+            $webhookOptions = [
+                'allowed_updates' => $settings['webhook']['allowed_updates'] ?? config('telegram.webhook.allowed_updates', ['message', 'callback_query']),
+                'max_connections' => $settings['webhook']['max_connections'] ?? config('telegram.webhook.max_connections', 40),
+            ];
+            
+            if (isset($settings['webhook']['secret_token'])) {
+                $webhookOptions['secret_token'] = $settings['webhook']['secret_token'];
+            }
+
+            // Регистрируем webhook с правильным URL
+            $webhookResult = $this->telegramService->setWebhook($bot->token, $webhookUrl, $webhookOptions);
+            
+            // Обновляем бота с правильным webhook URL
+            $bot->webhook_url = $webhookUrl;
+            $bot->webhook_registered = $webhookResult['success'] ?? false;
+            $bot->save();
 
             return response()->json([
                 'success' => true,
@@ -166,8 +171,8 @@ class BotController extends Controller
                     ], 400);
                 }
 
-                // Обновляем webhook URL
-                $webhookUrl = url('/api/telegram/webhook/' . $request->token);
+                // Обновляем webhook URL с ID бота
+                $webhookUrl = url('/api/telegram/webhook/' . $bot->id);
                 
                 // Настройки webhook из запроса или дефолтные
                 $allowedUpdates = $request->input('webhook.allowed_updates');
@@ -260,6 +265,77 @@ class BotController extends Controller
     }
 
     /**
+     * Обработка webhook от Telegram
+     */
+    public function handleWebhook(Request $request, string $id): JsonResponse
+    {
+        try {
+            $bot = Bot::findOrFail($id);
+            
+            // Проверяем secret_token, если он установлен
+            if (!empty($bot->settings['webhook']['secret_token'])) {
+                $secretToken = $request->header('X-Telegram-Bot-Api-Secret-Token');
+                if ($secretToken !== $bot->settings['webhook']['secret_token']) {
+                    \Illuminate\Support\Facades\Log::warning('Webhook secret token mismatch', [
+                        'bot_id' => $bot->id,
+                        'received_token' => $secretToken ? 'present' : 'missing',
+                    ]);
+                    return response()->json(['error' => 'Invalid secret token'], 403);
+                }
+            }
+            
+            // Получаем обновление от Telegram
+            $update = $request->all();
+            
+            \Illuminate\Support\Facades\Log::info('Telegram webhook received', [
+                'bot_id' => $bot->id,
+                'bot_name' => $bot->name,
+                'update_id' => $update['update_id'] ?? null,
+                'message_type' => $this->getUpdateType($update),
+            ]);
+            
+            // Если есть приветственное сообщение и это новое сообщение
+            if (isset($update['message']) && $bot->welcome_message) {
+                \Illuminate\Support\Facades\Log::info('Welcome message should be sent', [
+                    'bot_id' => $bot->id,
+                    'chat_id' => $update['message']['chat']['id'] ?? null,
+                ]);
+            }
+            
+            return response()->json(['ok' => true], 200);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Webhook processing error', [
+                'bot_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json(['error' => 'Internal server error'], 500);
+        }
+    }
+    
+    /**
+     * Определить тип обновления
+     */
+    private function getUpdateType(array $update): string
+    {
+        if (isset($update['message'])) return 'message';
+        if (isset($update['edited_message'])) return 'edited_message';
+        if (isset($update['channel_post'])) return 'channel_post';
+        if (isset($update['edited_channel_post'])) return 'edited_channel_post';
+        if (isset($update['callback_query'])) return 'callback_query';
+        if (isset($update['inline_query'])) return 'inline_query';
+        if (isset($update['chosen_inline_result'])) return 'chosen_inline_result';
+        if (isset($update['shipping_query'])) return 'shipping_query';
+        if (isset($update['pre_checkout_query'])) return 'pre_checkout_query';
+        if (isset($update['poll'])) return 'poll';
+        if (isset($update['poll_answer'])) return 'poll_answer';
+        if (isset($update['my_chat_member'])) return 'my_chat_member';
+        if (isset($update['chat_member'])) return 'chat_member';
+        if (isset($update['chat_join_request'])) return 'chat_join_request';
+        return 'unknown';
+    }
+
+    /**
      * Зарегистрировать webhook
      */
     public function registerWebhook(Request $request, string $id): JsonResponse
@@ -267,7 +343,7 @@ class BotController extends Controller
         $bot = Bot::findOrFail($id);
         
         try {
-            $webhookUrl = $bot->webhook_url ?: url('/api/telegram/webhook/' . $bot->token);
+            $webhookUrl = $bot->webhook_url ?: url('/api/telegram/webhook/' . $bot->id);
             
             // Настройки webhook из запроса или из настроек бота
             $settings = $bot->settings ?? [];

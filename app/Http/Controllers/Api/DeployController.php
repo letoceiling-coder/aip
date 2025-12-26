@@ -399,14 +399,23 @@ class DeployController extends Controller
             Log::info("🔍 HOME директория: {$homeDir}");
 
             // Формируем команду
-            // Если найден полный путь, используем PHP для его выполнения (обходит проблемы с правами)
-            // Если это просто 'composer', используем команду напрямую
+            // Если найден полный путь, используем sudo -u для запуска от правильного пользователя
+            // Это обходит проблемы с правами доступа при работе через веб-сервер от root
             if (!empty($composerPath) && $composerPath !== 'composer' && strpos($composerPath, '/') !== false) {
-                // Полный путь найден - используем PHP для выполнения composer скрипта
-                // Это обходит проблемы с правами доступа на выполнение файла
+                // Полный путь найден - определяем владельца и запускаем от него
+                // Извлекаем имя пользователя из пути (например, /home/d/dsc23ytp/bin/composer -> dsc23ytp)
+                $pathParts = explode('/', trim($composerPath, '/'));
+                $ownerUser = 'dsc23ytp'; // По умолчанию, если не удастся определить
+                
+                // Пытаемся определить пользователя из пути
+                if (count($pathParts) >= 3 && $pathParts[0] === 'home' && isset($pathParts[2])) {
+                    $ownerUser = $pathParts[2];
+                }
+                
+                // Используем sudo -u для запуска от правильного пользователя
                 $escapedPath = escapeshellarg($composerPath);
-                $command = "{$this->phpPath} {$escapedPath} install --no-dev --optimize-autoloader --no-interaction --no-scripts";
-                Log::info("🔍 Используем PHP для выполнения composer: {$this->phpPath} {$escapedPath}");
+                $command = "sudo -u " . escapeshellarg($ownerUser) . " {$this->phpPath} {$escapedPath} install --no-dev --optimize-autoloader --no-interaction --no-scripts 2>&1";
+                Log::info("🔍 Используем sudo -u {$ownerUser} для выполнения composer: {$this->phpPath} {$escapedPath}");
             } else {
                 // Используем команду composer напрямую (она должна быть в PATH)
                 $command = "composer install --no-dev --optimize-autoloader --no-interaction --no-scripts";

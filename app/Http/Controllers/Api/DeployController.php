@@ -391,11 +391,9 @@ class DeployController extends Controller
             $composerPath = $this->getComposerPath();
             Log::info("🔍 Путь к composer: {$composerPath}");
 
-            $homeDir = getenv('HOME');
-            if (!$homeDir) {
-                $projectUser = posix_getpwuid(posix_geteuid());
-                $homeDir = $projectUser['dir'] ?? '/tmp';
-            }
+            // Устанавливаем HOME в домашнюю директорию пользователя проекта для composer
+            // Это важно для правильной работы composer на Beget
+            $homeDir = dirname(dirname($this->basePath)); // /home/d/dsc23ytp
             Log::info("🔍 HOME директория: {$homeDir}");
 
             // Формируем команду
@@ -457,17 +455,14 @@ class DeployController extends Controller
     protected function getComposerPath(): string
     {
         // 1. Попробовать найти composer через which (работает лучше всего через веб-сервер)
+        // which уже проверил доступность, поэтому не нужно дополнительно проверять файл
         try {
             $whichProcess = Process::run('which composer 2>&1');
             if ($whichProcess->successful()) {
                 $foundPath = trim($whichProcess->output());
                 if ($foundPath && $foundPath !== 'composer') {
-                    // Проверяем через test -f, так как file_exists может не работать через веб-сервер
-                    $testProcess = Process::run("test -f " . escapeshellarg($foundPath) . " && echo 'exists' 2>&1");
-                    if ($testProcess->successful() && trim($testProcess->output()) === 'exists') {
-                        Log::info("Composer найден через which: {$foundPath}");
-                        return $foundPath;
-                    }
+                    Log::info("Composer найден через which: {$foundPath}");
+                    return $foundPath;
                 }
             }
         } catch (\Exception $e) {
@@ -477,8 +472,9 @@ class DeployController extends Controller
         // 2. Проверить явно указанный путь в .env
         $composerPath = env('COMPOSER_PATH');
         if ($composerPath && $composerPath !== '' && $composerPath !== 'composer') {
-            // Обрезаем пробелы и проверяем, что путь не пустой
+            // Обрезаем пробелы и кавычки, проверяем, что путь не пустой
             $composerPath = trim($composerPath);
+            $composerPath = trim($composerPath, '"\'');
             if ($composerPath) {
                 Log::info("Composer путь из .env: {$composerPath}");
                 return $composerPath;

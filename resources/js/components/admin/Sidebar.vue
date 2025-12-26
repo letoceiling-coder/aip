@@ -37,9 +37,9 @@
             <div v-if="!menu || menu.length === 0" class="text-center text-muted-foreground py-8">
                 Загрузка меню...
             </div>
-            <template v-else v-for="item in menu" :key="item.route || item.title">
+            <template v-else v-for="(item, index) in menu" :key="item?.route || item?.title || index">
                 <router-link
-                    v-if="!item.children && item.route && isRouteAvailable(item.route)"
+                    v-if="item && !item.children && item.route && isRouteAvailable(item.route)"
                     :to="{ name: item.route }"
                     @click="handleMobileMenuClick"
                     class="nav-menu-item flex items-center rounded-xl text-sm font-medium transition-all text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground px-4 py-3 gap-3"
@@ -52,7 +52,7 @@
                     </span>
                     <span v-if="!isCollapsed">{{ item.title }}</span>
                 </router-link>
-                <div v-else class="rounded-xl overflow-hidden transition-all" :class="isExpanded(item) ? 'bg-sidebar-accent/30' : ''">
+                <div v-else-if="item && item.children" class="rounded-xl overflow-hidden transition-all" :class="isExpanded(item) ? 'bg-sidebar-accent/30' : ''">
                     <button
                         @click="toggleExpanded(item)"
                         class="w-full flex items-center rounded-xl text-sm font-medium transition-all text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground px-4 py-3 gap-3"
@@ -83,9 +83,9 @@
                     >
                         <div class="pl-4 pr-2 py-2 space-y-1 overflow-y-auto max-h-[800px]">
                             <router-link
-                                v-for="child in item.children"
-                                :key="child.route"
-                                v-if="child.route && isRouteAvailable(child.route)"
+                                v-for="(child, childIndex) in item.children"
+                                :key="child?.route || childIndex"
+                                v-if="child && child.route && isRouteAvailable(child.route)"
                                 :to="{ name: child.route }"
                                 @click="handleMobileMenuClick"
                                 class="resource-submenu-item flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium transition-all text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -167,6 +167,7 @@ export default {
         
         // Загружаем меню при монтировании компонента
         onMounted(() => {
+            console.log('🔍 Sidebar mounted, isAuthenticated:', store.getters.isAuthenticated);
             if (store.getters.isAuthenticated) {
                 // Всегда загружаем меню при монтировании, чтобы получить актуальное
                 store.dispatch('fetchMenu');
@@ -175,8 +176,16 @@ export default {
         
         // Отслеживаем изменения меню для отладки
         watch(() => menu.value, (newMenu) => {
-            // Используем JSON для правильного логирования реактивных объектов
-            console.log('Menu updated in Sidebar:', JSON.parse(JSON.stringify(newMenu)));
+            console.log('📋 Menu updated in Sidebar:', {
+                menuLength: newMenu?.length || 0,
+                menu: JSON.parse(JSON.stringify(newMenu || [])),
+                menuItems: newMenu?.map(item => ({
+                    title: item?.title,
+                    route: item?.route,
+                    hasChildren: !!item?.children,
+                    childrenCount: item?.children?.length || 0
+                }))
+            });
         }, { immediate: true });
         const userInitials = computed(() => {
             if (!user.value?.name) return 'U';
@@ -228,11 +237,19 @@ export default {
 
         // Проверка существования роута перед использованием
         const isRouteAvailable = (routeName) => {
+            if (!routeName) {
+                console.warn('⚠️ Route name is empty');
+                return false;
+            }
             try {
-                const route = router.resolve({ name: routeName });
-                return route && route.name === routeName;
+                const resolvedRoute = router.resolve({ name: routeName });
+                const isAvailable = resolvedRoute && resolvedRoute.name === routeName;
+                if (!isAvailable) {
+                    console.warn('⚠️ Route not available:', routeName, 'resolved:', resolvedRoute);
+                }
+                return isAvailable;
             } catch (error) {
-                console.warn('⚠️ Route not available:', routeName, error);
+                console.warn('⚠️ Route resolution error:', routeName, error);
                 return false;
             }
         };

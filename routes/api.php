@@ -83,6 +83,12 @@ Route::post('/deploy', [DeployController::class, 'deploy'])
 Route::post('/seed', [DeployController::class, 'seed'])
     ->middleware('deploy.token');
 
+// Webhook от GitHub для автоматического деплоя (проверка подписи внутри контроллера)
+Route::post('/webhook/github', [\App\Http\Controllers\Api\WebhookController::class, 'github']);
+
+// Проверка подписки (публичный endpoint, используется фронтендом)
+Route::get('/subscription/check', [\App\Http\Controllers\Api\SubscriptionCheckController::class, 'check']);
+
 // Публичные роуты для просмотра логов
 Route::get('/logs', [\App\Http\Controllers\LogController::class, 'getLogs']);
 Route::get('/logs/files', [\App\Http\Controllers\LogController::class, 'getLogFilesList']);

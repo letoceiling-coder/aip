@@ -497,24 +497,6 @@ class DeployController extends Controller
             return $composerPath;
         }
 
-        // 2. Попробовать найти composer через which (самый надежный способ)
-        try {
-            $whichProcess = Process::run('which composer 2>&1');
-            if ($whichProcess->successful()) {
-                $foundPath = trim($whichProcess->output());
-                if ($foundPath && $foundPath !== 'composer') {
-                    // Проверяем существование найденного пути
-                    $testProcess = Process::run("test -f " . escapeshellarg($foundPath) . " && echo 'exists' 2>&1");
-                    if ($testProcess->successful() && trim($testProcess->output()) === 'exists') {
-                        Log::info("Composer найден через which: {$foundPath}");
-                        return $foundPath;
-                    }
-                }
-            }
-        } catch (\Exception $e) {
-            Log::warning("Ошибка при поиске composer через which: " . $e->getMessage());
-        }
-
         // 3. Проверить локальный composer в директории проекта
         $localComposer = $this->basePath . '/bin/composer';
         try {

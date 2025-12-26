@@ -34,7 +34,8 @@
                 <div class="flex items-start justify-between mb-4">
                     <div>
                         <h3 class="text-lg font-semibold text-foreground">{{ bot.name }}</h3>
-                        <p v-if="bot.username" class="text-sm text-muted-foreground">@{{ bot.username }}</p>
+                    <p v-if="bot.username" class="text-sm text-muted-foreground">@{{ bot.username }}</p>
+                    <p v-else class="text-sm text-muted-foreground">Username не указан</p>
                     </div>
                     <span
                         :class="[
@@ -153,7 +154,7 @@
                             <span class="text-sm">Бот активен</span>
                         </label>
                     </div>
-                    <div class="space-y-4">
+                    <div v-if="showEditModal" class="space-y-4">
                         <div>
                             <label class="text-sm font-medium mb-2 block">Настройки Webhook</label>
                             <div class="space-y-3">
@@ -165,7 +166,6 @@
                                         placeholder="message, callback_query, inline_query"
                                         class="w-full h-10 px-3 border border-border rounded bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm"
                                     />
-                                    <p class="text-xs text-muted-foreground mt-1">Доступные: message, edited_message, channel_post, edited_channel_post, callback_query, inline_query, chosen_inline_result, shipping_query, pre_checkout_query, poll, poll_answer, my_chat_member, chat_member, chat_join_request</p>
                                 </div>
                                 <div>
                                     <label class="text-xs text-muted-foreground mb-1 block">Максимальное количество соединений (1-100)</label>
@@ -287,13 +287,17 @@ export default {
 
         const settingsJson = computed({
             get: () => {
-                return JSON.stringify(form.value.settings || {}, null, 2)
+                try {
+                    return JSON.stringify(form.value.settings || {}, null, 2)
+                } catch (e) {
+                    return '{}'
+                }
             },
             set: (value) => {
                 try {
                     form.value.settings = JSON.parse(value || '{}')
                 } catch (e) {
-                    // Оставляем старое значение при ошибке парсинга
+                    console.error('Error parsing JSON:', e)
                 }
             }
         })
@@ -304,11 +308,13 @@ export default {
             try {
                 const response = await apiGet('/v1/bots')
                 if (!response.ok) {
-                    throw new Error('Ошибка загрузки ботов')
+                    const errorData = await response.json().catch(() => ({}))
+                    throw new Error(errorData.message || 'Ошибка загрузки ботов')
                 }
                 const data = await response.json()
                 bots.value = data.data || []
             } catch (err) {
+                console.error('Error fetching bots:', err)
                 error.value = err.message || 'Ошибка загрузки ботов'
             } finally {
                 loading.value = false
@@ -316,23 +322,33 @@ export default {
         }
 
         const editBot = (bot) => {
-            const settings = bot.settings || {}
-            const webhookSettings = settings.webhook || {}
-            
-            form.value = {
-                id: bot.id,
-                name: bot.name,
-                token: bot.token,
-                welcome_message: bot.welcome_message || '',
-                is_active: bot.is_active ?? true,
-                settings: settings,
-                webhook_allowed_updates: Array.isArray(webhookSettings.allowed_updates) 
-                    ? webhookSettings.allowed_updates.join(', ') 
-                    : (webhookSettings.allowed_updates || 'message, callback_query'),
-                webhook_max_connections: webhookSettings.max_connections || 40,
-                webhook_secret_token: webhookSettings.secret_token || '',
+            try {
+                const settings = bot.settings || {}
+                const webhookSettings = settings.webhook || {}
+                
+                form.value = {
+                    id: bot.id,
+                    name: bot.name || '',
+                    token: bot.token || '',
+                    welcome_message: bot.welcome_message || '',
+                    is_active: bot.is_active !== undefined ? bot.is_active : true,
+                    settings: settings,
+                    webhook_allowed_updates: Array.isArray(webhookSettings.allowed_updates) 
+                        ? webhookSettings.allowed_updates.join(', ') 
+                        : (webhookSettings.allowed_updates || 'message, callback_query'),
+                    webhook_max_connections: webhookSettings.max_connections || 40,
+                    webhook_secret_token: webhookSettings.secret_token || '',
+                }
+                showEditModal.value = true
+            } catch (err) {
+                console.error('Error editing bot:', err)
+                Swal.fire({
+                    title: 'Ошибка',
+                    text: 'Не удалось загрузить данные бота',
+                    icon: 'error',
+                    confirmButtonText: 'ОК'
+                })
             }
-            showEditModal.value = true
         }
 
         const deleteBot = async (bot) => {
@@ -352,7 +368,7 @@ export default {
             try {
                 const response = await apiDelete(`/v1/bots/${bot.id}`)
                 if (!response.ok) {
-                    const errorData = await response.json()
+                    const errorData = await response.json().catch(() => ({}))
                     throw new Error(errorData.message || 'Ошибка удаления бота')
                 }
                 await Swal.fire({
@@ -365,6 +381,7 @@ export default {
                 })
                 await fetchBots()
             } catch (err) {
+                console.error('Error deleting bot:', err)
                 Swal.fire({
                     title: 'Ошибка',
                     text: err.message || 'Ошибка удаления бота',
@@ -381,7 +398,7 @@ export default {
                 const botData = {
                     name: form.value.name,
                     token: form.value.token,
-                    welcome_message: form.value.welcome_message,
+                    welcome_message: form.value.welcome_message || null,
                     is_active: form.value.is_active,
                 }
 
@@ -416,7 +433,7 @@ export default {
                 }
 
                 if (!response.ok) {
-                    const errorData = await response.json()
+                    const errorData = await response.json().catch(() => ({}))
                     throw new Error(errorData.message || 'Ошибка сохранения бота')
                 }
 
@@ -432,6 +449,7 @@ export default {
                 closeModal()
                 await fetchBots()
             } catch (err) {
+                console.error('Error saving bot:', err)
                 error.value = err.message || 'Ошибка сохранения бота'
                 Swal.fire({
                     title: 'Ошибка',
@@ -449,12 +467,13 @@ export default {
             try {
                 const response = await apiGet(`/v1/bots/${bot.id}/check-webhook`)
                 if (!response.ok) {
-                    const errorData = await response.json()
+                    const errorData = await response.json().catch(() => ({}))
                     throw new Error(errorData.message || 'Ошибка проверки webhook')
                 }
                 const data = await response.json()
                 webhookInfo.value = data.data?.data || data.data || {}
             } catch (err) {
+                console.error('Error checking webhook:', err)
                 Swal.fire({
                     title: 'Ошибка',
                     text: err.message || 'Ошибка проверки webhook',
@@ -471,7 +490,7 @@ export default {
             try {
                 const response = await apiPost(`/v1/bots/${bot.id}/register-webhook`)
                 if (!response.ok) {
-                    const errorData = await response.json()
+                    const errorData = await response.json().catch(() => ({}))
                     throw new Error(errorData.message || 'Ошибка регистрации webhook')
                 }
                 const data = await response.json()
@@ -485,6 +504,7 @@ export default {
                 
                 await fetchBots()
             } catch (err) {
+                console.error('Error registering webhook:', err)
                 Swal.fire({
                     title: 'Ошибка',
                     text: err.message || 'Ошибка регистрации webhook',
@@ -512,8 +532,10 @@ export default {
             }
         }
 
-        onMounted(async () => {
-            await fetchBots()
+        onMounted(() => {
+            fetchBots().catch(err => {
+                console.error('Error in onMounted:', err)
+            })
         })
 
         return {
@@ -538,4 +560,3 @@ export default {
     }
 }
 </script>
-

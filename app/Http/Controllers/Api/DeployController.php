@@ -397,13 +397,21 @@ class DeployController extends Controller
             Log::info("🔍 HOME директория: {$homeDir}");
 
             // Формируем команду
-            // На Beget веб-сервер не может прочитать файл composer напрямую из-за прав доступа
-            // Используем cat для чтения файла и передачу в PHP (обходит проблемы с правами на чтение)
+            // Если composer в директории проекта - используем его напрямую через PHP
+            // Это работает лучше всего на Beget, так как веб-сервер имеет доступ к файлам проекта
             if (!empty($composerPath) && $composerPath !== 'composer' && strpos($composerPath, '/') !== false) {
-                // Используем cat для чтения файла и передачу в PHP через stdin
                 $escapedPath = escapeshellarg($composerPath);
-                $command = "cat {$escapedPath} | {$this->phpPath} - install --no-dev --optimize-autoloader --no-interaction --no-scripts 2>&1";
-                Log::info("🔍 Используем cat + PHP для выполнения composer: cat {$escapedPath} | {$this->phpPath}");
+                
+                // Если composer.phar - используем PHP напрямую
+                if (strpos($composerPath, 'composer.phar') !== false) {
+                    $command = "{$this->phpPath} {$escapedPath} install --no-dev --optimize-autoloader --no-interaction --no-scripts 2>&1";
+                    Log::info("🔍 Используем PHP для выполнения composer.phar: {$this->phpPath} {$escapedPath}");
+                } else {
+                    // Для обычного composer скрипта пробуем выполнить через PHP
+                    // Сначала пробуем напрямую через PHP
+                    $command = "{$this->phpPath} {$escapedPath} install --no-dev --optimize-autoloader --no-interaction --no-scripts 2>&1";
+                    Log::info("🔍 Используем PHP для выполнения composer: {$this->phpPath} {$escapedPath}");
+                }
             } else {
                 // Если путь не найден, пробуем команду composer (может не сработать из-за прав)
                 $command = "composer install --no-dev --optimize-autoloader --no-interaction --no-scripts 2>&1";
@@ -451,8 +459,60 @@ class DeployController extends Controller
      */
     protected function getComposerPath(): string
     {
-        // 1. Попробовать найти composer через which (работает лучше всего через веб-сервер)
-        // which уже проверил доступность, поэтому не нужно дополнительно проверять файл
+        // 1. Проверить локальный composer в директории проекта (приоритет - веб-сервер имеет доступ)
+        $localComposer = $this->basePath . '/bin/composer';
+        try {
+            $testProcess = Process::run("test -f " . escapeshellarg($localComposer) . " && echo 'exists' 2>&1");
+            if ($testProcess->successful() && trim($testProcess->output()) === 'exists') {
+                Log::info("Composer найден локально в проекте: {$localComposer}");
+                return $localComposer;
+            }
+        } catch (\Exception $e) {
+            // Игнорируем ошибку
+        }
+
+        // 2. Если локального composer нет - попробовать скачать его
+        try {
+            $binDir = $this->basePath . '/bin';
+            if (!is_dir($binDir)) {
+                mkdir($binDir, 0755, true);
+            }
+            
+            // Скачиваем composer.phar
+            $composerPhar = $binDir . '/composer.phar';
+            Log::info("Попытка скачать composer в: {$composerPhar}");
+            
+            $downloadProcess = Process::path($this->basePath)
+                ->run("curl -sS https://getcomposer.org/installer | {$this->phpPath} 2>&1");
+            
+            if ($downloadProcess->successful()) {
+                // Проверяем, был ли создан composer.phar в текущей директории
+                $checkPhar = Process::run("test -f " . escapeshellarg($this->basePath . '/composer.phar') . " && echo 'exists' 2>&1");
+                if ($checkPhar->successful() && trim($checkPhar->output()) === 'exists') {
+                    // Перемещаем в bin/
+                    Process::path($this->basePath)
+                        ->run("mv composer.phar " . escapeshellarg($composerPhar) . " 2>&1");
+                    Log::info("Composer успешно скачан: {$composerPhar}");
+                    return $composerPhar;
+                }
+            }
+        } catch (\Exception $e) {
+            Log::warning("Не удалось скачать composer: " . $e->getMessage());
+        }
+
+        // 3. Проверить явно указанный путь в .env
+        $composerPath = env('COMPOSER_PATH');
+        if ($composerPath && $composerPath !== '' && $composerPath !== 'composer') {
+            // Обрезаем пробелы и кавычки, проверяем, что путь не пустой
+            $composerPath = trim($composerPath);
+            $composerPath = trim($composerPath, '"\'');
+            if ($composerPath) {
+                Log::info("Composer путь из .env: {$composerPath}");
+                return $composerPath;
+            }
+        }
+
+        // 4. Попробовать найти composer через which (может не работать через веб-сервер)
         try {
             $whichProcess = Process::run('which composer 2>&1');
             if ($whichProcess->successful()) {
@@ -465,32 +525,8 @@ class DeployController extends Controller
         } catch (\Exception $e) {
             Log::warning("Ошибка при поиске composer через which: " . $e->getMessage());
         }
-
-        // 2. Проверить явно указанный путь в .env
-        $composerPath = env('COMPOSER_PATH');
-        if ($composerPath && $composerPath !== '' && $composerPath !== 'composer') {
-            // Обрезаем пробелы и кавычки, проверяем, что путь не пустой
-            $composerPath = trim($composerPath);
-            $composerPath = trim($composerPath, '"\'');
-            if ($composerPath) {
-                Log::info("Composer путь из .env: {$composerPath}");
-                return $composerPath;
-            }
-        }
-
-        // 3. Проверить локальный composer в директории проекта
-        $localComposer = $this->basePath . '/bin/composer';
-        try {
-            $testProcess = Process::run("test -f " . escapeshellarg($localComposer) . " && echo 'exists' 2>&1");
-            if ($testProcess->successful() && trim($testProcess->output()) === 'exists') {
-                Log::info("Composer найден локально в проекте: {$localComposer}");
-                return $localComposer;
-            }
-        } catch (\Exception $e) {
-            // Игнорируем ошибку
-        }
         
-        // 4. Попробовать найти composer в стандартных местах
+        // 5. Попробовать найти composer в стандартных местах
         $possiblePaths = [
             '/usr/local/bin/composer',
             '/usr/bin/composer',
@@ -509,7 +545,7 @@ class DeployController extends Controller
             }
         }
 
-        // 5. Последний fallback - возвращаем пустую строку (будет ошибка при выполнении)
+        // 6. Последний fallback - возвращаем пустую строку (будет ошибка при выполнении)
         Log::error("Composer не найден нигде. Установите composer или укажите COMPOSER_PATH в .env");
         return '';
     }

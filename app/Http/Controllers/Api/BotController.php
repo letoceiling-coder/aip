@@ -403,6 +403,13 @@ class BotController extends Controller
         try {
             $webhookUrl = $bot->webhook_url ?: url('/api/telegram/webhook/' . $bot->id);
             
+            \Illuminate\Support\Facades\Log::info('🔧 Registering webhook', [
+                'bot_id' => $bot->id,
+                'bot_name' => $bot->name,
+                'webhook_url' => $webhookUrl,
+                'current_webhook_url' => $bot->webhook_url,
+            ]);
+            
             // Настройки webhook из запроса или из настроек бота
             $settings = $bot->settings ?? [];
             $allowedUpdates = $request->input('allowed_updates');
@@ -423,12 +430,35 @@ class BotController extends Controller
                 $webhookOptions['secret_token'] = $secretToken;
             }
             
+            \Illuminate\Support\Facades\Log::info('📤 Sending webhook registration to Telegram', [
+                'bot_id' => $bot->id,
+                'webhook_url' => $webhookUrl,
+                'options' => $webhookOptions,
+            ]);
+            
             $result = $this->telegramService->setWebhook($bot->token, $webhookUrl, $webhookOptions);
+            
+            \Illuminate\Support\Facades\Log::info('📥 Telegram API response', [
+                'bot_id' => $bot->id,
+                'success' => $result['success'] ?? false,
+                'message' => $result['message'] ?? null,
+                'data' => $result['data'] ?? null,
+            ]);
             
             if ($result['success']) {
                 $bot->update([
                     'webhook_url' => $webhookUrl,
                     'webhook_registered' => true,
+                ]);
+                \Illuminate\Support\Facades\Log::info('✅ Webhook registered successfully', [
+                    'bot_id' => $bot->id,
+                    'webhook_url' => $webhookUrl,
+                ]);
+            } else {
+                \Illuminate\Support\Facades\Log::error('❌ Failed to register webhook', [
+                    'bot_id' => $bot->id,
+                    'webhook_url' => $webhookUrl,
+                    'error' => $result['message'] ?? 'Unknown error',
                 ]);
             }
             
@@ -438,6 +468,11 @@ class BotController extends Controller
                 'data' => $result['data'] ?? null,
             ]);
         } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('❌ Exception during webhook registration', [
+                'bot_id' => $bot->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Ошибка при регистрации webhook: ' . $e->getMessage(),

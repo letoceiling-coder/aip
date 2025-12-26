@@ -56,12 +56,27 @@ class TelegramService
                 'url' => $url,
             ], $options);
 
+            Log::info('📤 Sending setWebhook request to Telegram API', [
+                'url' => $url,
+                'options' => $options,
+                'api_url' => $this->apiBaseUrl . $token . '/setWebhook',
+            ]);
+
             $response = Http::timeout(10)->post($this->apiBaseUrl . $token . '/setWebhook', $params);
+            
+            Log::info('📥 Telegram API setWebhook response', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
             
             if ($response->successful()) {
                 $data = $response->json();
                 
                 if ($data['ok'] ?? false) {
+                    Log::info('✅ Webhook set successfully', [
+                        'url' => $url,
+                        'result' => $data['result'] ?? [],
+                    ]);
                     return [
                         'success' => true,
                         'message' => 'Webhook успешно установлен',
@@ -69,18 +84,34 @@ class TelegramService
                     ];
                 }
                 
+                Log::error('❌ Telegram API returned error', [
+                    'url' => $url,
+                    'description' => $data['description'] ?? 'Unknown error',
+                    'error_code' => $data['error_code'] ?? null,
+                ]);
+                
                 return [
                     'success' => false,
                     'message' => $data['description'] ?? 'Не удалось установить webhook',
                 ];
             }
             
+            Log::error('❌ HTTP error when setting webhook', [
+                'url' => $url,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+            
             return [
                 'success' => false,
                 'message' => 'Ошибка подключения к Telegram API',
             ];
         } catch (\Exception $e) {
-            Log::error('Telegram setWebhook error: ' . $e->getMessage());
+            Log::error('❌ Exception when setting webhook', [
+                'url' => $url,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return [
                 'success' => false,
                 'message' => 'Ошибка: ' . $e->getMessage(),

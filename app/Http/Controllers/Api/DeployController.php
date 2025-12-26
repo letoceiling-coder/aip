@@ -403,11 +403,12 @@ class DeployController extends Controller
                 // Если путь не найден или это просто 'composer', используем composer как команду напрямую
                 $command = "composer install --no-dev --optimize-autoloader --no-interaction --no-scripts";
             } else {
-                // Если найден полный путь, используем его напрямую (composer - это исполняемый файл)
+                // Если найден полный путь, используем PHP для выполнения (composer - это PHP скрипт с shebang)
+                // Используем bash для правильной обработки shebang и переменных окружения
                 $escapedPath = escapeshellarg($composerPath);
                 
-                // Используем полный путь к composer напрямую
-                $command = "{$escapedPath} install --no-dev --optimize-autoloader --no-interaction --no-scripts";
+                // Используем bash -c для выполнения, чтобы правильно обработать shebang
+                $command = "bash -c {$escapedPath} install --no-dev --optimize-autoloader --no-interaction --no-scripts";
             }
             Log::info("🔍 Команда composer: {$command}");
 

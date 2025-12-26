@@ -846,12 +846,13 @@ class DeployController extends Controller
      */
     protected function clearAllCaches(): array
     {
+        // Сначала очищаем отдельные кеши, затем optimize:clear
+        // optimize:clear очищает все, но может вызвать проблемы с загрузкой маршрутов
         $commands = [
             'config:clear',
             'cache:clear',
             'route:clear',
             'view:clear',
-            'optimize:clear',
         ];
 
         $results = [];
@@ -861,10 +862,29 @@ class DeployController extends Controller
                     ->run("{$this->phpPath} artisan {$command}");
 
                 $results[$command] = $process->successful();
+                
+                if ($command === 'route:clear') {
+                    Log::info("Кеш маршрутов очищен");
+                }
             } catch (\Exception $e) {
                 $results[$command] = false;
                 Log::warning("Ошибка очистки кеша: {$command}", ['error' => $e->getMessage()]);
             }
+        }
+
+        // Затем очищаем все через optimize:clear (но это может вызвать проблемы)
+        // Поэтому делаем это аккуратно
+        try {
+            $process = Process::path($this->basePath)
+                ->run("{$this->phpPath} artisan optimize:clear");
+            
+            $results['optimize:clear'] = $process->successful();
+            Log::info("Кеш package discovery удален");
+            Log::info("Кеш сервис-провайдеров удален");
+            Log::info("Кеш конфигурации очищен");
+        } catch (\Exception $e) {
+            $results['optimize:clear'] = false;
+            Log::warning("Ошибка optimize:clear", ['error' => $e->getMessage()]);
         }
 
         return [
@@ -878,6 +898,8 @@ class DeployController extends Controller
      */
     protected function optimizeApplication(): array
     {
+        // Важно: сначала кешируем конфигурацию, затем маршруты
+        // Это гарантирует, что маршруты будут загружены правильно
         $commands = [
             'config:cache',
             'route:cache',
@@ -890,7 +912,24 @@ class DeployController extends Controller
                 $process = Process::path($this->basePath)
                     ->run("{$this->phpPath} artisan {$command}");
 
-                $results[$command] = $process->successful();
+                $success = $process->successful();
+                $results[$command] = $success;
+                
+                if ($command === 'route:cache' && $success) {
+                    // Проверяем, что файл маршрутов создан
+                    $routesCachePath = $this->basePath . '/bootstrap/cache/routes-v7.php';
+                    if (file_exists($routesCachePath)) {
+                        Log::info("✅ Файл маршрутов успешно создан: routes-v7.php");
+                    } else {
+                        Log::warning("⚠️ Файл маршрутов не найден после кеширования: routes-v7.php");
+                        $results[$command] = false;
+                    }
+                }
+                
+                if (!$success) {
+                    $error = $process->errorOutput() ?: $process->output();
+                    Log::warning("Ошибка оптимизации: {$command}", ['error' => $error]);
+                }
             } catch (\Exception $e) {
                 $results[$command] = false;
                 Log::warning("Ошибка оптимизации: {$command}", ['error' => $e->getMessage()]);

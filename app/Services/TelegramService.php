@@ -176,5 +176,72 @@ class TelegramService
             ];
         }
     }
+
+    /**
+     * Отправить сообщение
+     */
+    public function sendMessage(string $token, int|string $chatId, string $text, array $options = []): array
+    {
+        try {
+            $params = array_merge([
+                'chat_id' => $chatId,
+                'text' => $text,
+            ], $options);
+
+            Log::info('📤 Sending message via Telegram API', [
+                'chat_id' => $chatId,
+                'text_length' => strlen($text),
+                'has_options' => !empty($options),
+            ]);
+
+            $response = Http::timeout(10)->post($this->apiBaseUrl . $token . '/sendMessage', $params);
+            
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                if ($data['ok'] ?? false) {
+                    Log::info('✅ Message sent successfully', [
+                        'chat_id' => $chatId,
+                        'message_id' => $data['result']['message_id'] ?? null,
+                    ]);
+                    return [
+                        'success' => true,
+                        'data' => $data['result'] ?? [],
+                    ];
+                }
+                
+                Log::error('❌ Telegram API error', [
+                    'chat_id' => $chatId,
+                    'description' => $data['description'] ?? 'Unknown error',
+                ]);
+                
+                return [
+                    'success' => false,
+                    'message' => $data['description'] ?? 'Не удалось отправить сообщение',
+                ];
+            }
+            
+            Log::error('❌ HTTP error sending message', [
+                'chat_id' => $chatId,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+            
+            return [
+                'success' => false,
+                'message' => 'Ошибка подключения к Telegram API',
+            ];
+        } catch (\Exception $e) {
+            Log::error('❌ Telegram sendMessage error: ' . $e->getMessage(), [
+                'chat_id' => $chatId,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return [
+                'success' => false,
+                'message' => 'Ошибка: ' . $e->getMessage(),
+            ];
+        }
+    }
 }
 

@@ -269,45 +269,103 @@ class BotController extends Controller
      */
     public function handleWebhook(Request $request, string $id): JsonResponse
     {
+        \Illuminate\Support\Facades\Log::info('🔔 Webhook request received', [
+            'bot_id' => $id,
+            'method' => $request->method(),
+            'ip' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'headers' => $request->headers->all(),
+            'raw_body' => $request->getContent(),
+        ]);
+
         try {
             $bot = Bot::findOrFail($id);
+            
+            \Illuminate\Support\Facades\Log::info('✅ Bot found', [
+                'bot_id' => $bot->id,
+                'bot_name' => $bot->name,
+                'bot_username' => $bot->username,
+                'is_active' => $bot->is_active,
+            ]);
             
             // Проверяем secret_token, если он установлен
             if (!empty($bot->settings['webhook']['secret_token'])) {
                 $secretToken = $request->header('X-Telegram-Bot-Api-Secret-Token');
                 if ($secretToken !== $bot->settings['webhook']['secret_token']) {
-                    \Illuminate\Support\Facades\Log::warning('Webhook secret token mismatch', [
+                    \Illuminate\Support\Facades\Log::warning('❌ Webhook secret token mismatch', [
                         'bot_id' => $bot->id,
                         'received_token' => $secretToken ? 'present' : 'missing',
+                        'expected_token' => 'present',
                     ]);
                     return response()->json(['error' => 'Invalid secret token'], 403);
                 }
+                \Illuminate\Support\Facades\Log::info('✅ Secret token verified');
             }
             
             // Получаем обновление от Telegram
             $update = $request->all();
             
-            \Illuminate\Support\Facades\Log::info('Telegram webhook received', [
+            \Illuminate\Support\Facades\Log::info('📨 Telegram update received', [
                 'bot_id' => $bot->id,
                 'bot_name' => $bot->name,
                 'update_id' => $update['update_id'] ?? null,
                 'message_type' => $this->getUpdateType($update),
+                'update' => $update,
             ]);
             
-            // Если есть приветственное сообщение и это новое сообщение
-            if (isset($update['message']) && $bot->welcome_message) {
-                \Illuminate\Support\Facades\Log::info('Welcome message should be sent', [
+            // Обработка сообщений
+            if (isset($update['message'])) {
+                $message = $update['message'];
+                $chatId = $message['chat']['id'] ?? null;
+                $text = $message['text'] ?? null;
+                
+                \Illuminate\Support\Facades\Log::info('💬 Message received', [
                     'bot_id' => $bot->id,
-                    'chat_id' => $update['message']['chat']['id'] ?? null,
+                    'chat_id' => $chatId,
+                    'text' => $text,
+                    'from' => $message['from'] ?? null,
                 ]);
+                
+                // Обработка команды /start
+                if ($text === '/start' || str_starts_with($text, '/start')) {
+                    \Illuminate\Support\Facades\Log::info('🚀 /start command received', [
+                        'bot_id' => $bot->id,
+                        'chat_id' => $chatId,
+                    ]);
+                    
+                    // Отправляем приветственное сообщение
+                    if ($bot->welcome_message) {
+                        $this->telegramService->sendMessage(
+                            $bot->token,
+                            $chatId,
+                            $bot->welcome_message
+                        );
+                        \Illuminate\Support\Facades\Log::info('✅ Welcome message sent', [
+                            'bot_id' => $bot->id,
+                            'chat_id' => $chatId,
+                        ]);
+                    } else {
+                        \Illuminate\Support\Facades\Log::info('ℹ️ No welcome message configured', [
+                            'bot_id' => $bot->id,
+                        ]);
+                    }
+                }
             }
             
             return response()->json(['ok' => true], 200);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            \Illuminate\Support\Facades\Log::error('❌ Bot not found', [
+                'bot_id' => $id,
+                'error' => $e->getMessage(),
+            ]);
+            return response()->json(['error' => 'Bot not found'], 404);
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Webhook processing error', [
+            \Illuminate\Support\Facades\Log::error('❌ Webhook processing error', [
                 'bot_id' => $id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
             ]);
             return response()->json(['error' => 'Internal server error'], 500);
         }

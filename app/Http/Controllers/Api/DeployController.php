@@ -462,32 +462,51 @@ class DeployController extends Controller
      */
     protected function getComposerPath(): string
     {
-        // 1. Проверить явно указанный путь в .env
+        // 1. Проверить явно указанный путь в .env (приоритет!)
         $composerPath = env('COMPOSER_PATH');
-        if ($composerPath && file_exists($composerPath)) {
-            Log::info("Composer найден через .env: {$composerPath}");
-            return $composerPath;
+        if ($composerPath && $composerPath !== '' && $composerPath !== 'composer') {
+            // Проверяем существование через shell, так как file_exists может не работать через веб-сервер
+            try {
+                $testProcess = Process::run("test -f " . escapeshellarg($composerPath) . " && echo 'exists' 2>&1");
+                if ($testProcess->successful() && trim($testProcess->output()) === 'exists') {
+                    Log::info("Composer найден через .env: {$composerPath}");
+                    return $composerPath;
+                } else {
+                    Log::warning("Composer путь из .env не найден: {$composerPath}");
+                }
+            } catch (\Exception $e) {
+                Log::warning("Не удалось проверить composer путь из .env: " . $e->getMessage());
+            }
         }
 
-        // 2. Проверить локальный composer в директории проекта (приоритет!)
-        $localComposer = $this->basePath . '/bin/composer';
-        if (file_exists($localComposer)) {
-            Log::info("Composer найден локально в проекте: {$localComposer}");
-            return $localComposer;
-        }
-
-        // 3. Попробовать найти composer через which (самый надежный способ)
+        // 2. Попробовать найти composer через which (самый надежный способ)
         try {
             $whichProcess = Process::run('which composer 2>&1');
             if ($whichProcess->successful()) {
                 $foundPath = trim($whichProcess->output());
-                if ($foundPath) {
-                    Log::info("Composer найден через which: {$foundPath}");
-                    return $foundPath;
+                if ($foundPath && $foundPath !== 'composer') {
+                    // Проверяем существование найденного пути
+                    $testProcess = Process::run("test -f " . escapeshellarg($foundPath) . " && echo 'exists' 2>&1");
+                    if ($testProcess->successful() && trim($testProcess->output()) === 'exists') {
+                        Log::info("Composer найден через which: {$foundPath}");
+                        return $foundPath;
+                    }
                 }
             }
         } catch (\Exception $e) {
             Log::warning("Ошибка при поиске composer через which: " . $e->getMessage());
+        }
+
+        // 3. Проверить локальный composer в директории проекта
+        $localComposer = $this->basePath . '/bin/composer';
+        try {
+            $testProcess = Process::run("test -f " . escapeshellarg($localComposer) . " && echo 'exists' 2>&1");
+            if ($testProcess->successful() && trim($testProcess->output()) === 'exists') {
+                Log::info("Composer найден локально в проекте: {$localComposer}");
+                return $localComposer;
+            }
+        } catch (\Exception $e) {
+            // Игнорируем ошибку
         }
         
         // 4. Попробовать найти composer в стандартных местах
@@ -498,9 +517,8 @@ class DeployController extends Controller
         ];
 
         foreach ($possiblePaths as $path) {
-            // Проверяем через test -f, так как file_exists() может не работать из-за прав доступа
             try {
-                $testProcess = Process::run("test -f {$path} && echo 'exists' 2>&1");
+                $testProcess = Process::run("test -f " . escapeshellarg($path) . " && echo 'exists' 2>&1");
                 if ($testProcess->successful() && trim($testProcess->output()) === 'exists') {
                     Log::info("Composer найден по пути: {$path}");
                     return $path;
@@ -510,20 +528,7 @@ class DeployController extends Controller
             }
         }
 
-        // 5. Если composer не найден, пробуем использовать через shell
-        // Проверяем, доступен ли composer как команда
-        try {
-            $testProcess = Process::run('composer --version 2>&1');
-            if ($testProcess->successful()) {
-                Log::info("Composer доступен как команда в PATH");
-                // Возвращаем пустую строку, чтобы использовать composer напрямую
-                return '';
-            }
-        } catch (\Exception $e) {
-            Log::warning("Composer не доступен как команда: " . $e->getMessage());
-        }
-
-        // 6. Последний fallback - возвращаем пустую строку (будет ошибка при выполнении)
+        // 5. Последний fallback - возвращаем пустую строку (будет ошибка при выполнении)
         Log::error("Composer не найден нигде. Установите composer или укажите COMPOSER_PATH в .env");
         return '';
     }

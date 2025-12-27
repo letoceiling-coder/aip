@@ -1,6 +1,6 @@
 {
-  "_StatusBadge-DDXfu8Hi.js": {
-    "file": "assets/StatusBadge-DDXfu8Hi.js",
+  "_StatusBadge-CzgJHqvl.js": {
+    "file": "assets/StatusBadge-CzgJHqvl.js",
     "name": "StatusBadge",
     "imports": [
       "resources/js/admin.js"
@@ -15,7 +15,7 @@
     "name": "sweetalert2.esm.all"
   },
   "resources/css/app.css": {
-    "file": "assets/app-D5PJVqND.css",
+    "file": "assets/app-TpbsSsPd.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -24,7 +24,7 @@
     ]
   },
   "resources/js/admin.js": {
-    "file": "assets/admin-DOSAmZkU.js",
+    "file": "assets/admin-D4hk6-Wm.js",
     "name": "admin",
     "src": "resources/js/admin.js",
     "isEntry": true,
@@ -43,12 +43,13 @@
       "resources/js/pages/admin/Documentation.vue",
       "resources/js/pages/admin/Support.vue",
       "resources/js/pages/admin/SupportTicket.vue",
+      "resources/js/pages/admin/Logs.vue",
       "resources/js/pages/admin/Bots.vue",
       "resources/js/pages/admin/BotManagement.vue"
     ]
   },
   "resources/js/layouts/AdminLayout.vue": {
-    "file": "assets/AdminLayout-DOPT7S6L.js",
+    "file": "assets/AdminLayout-DIeKI3-c.js",
     "name": "AdminLayout",
     "src": "resources/js/layouts/AdminLayout.vue",
     "isDynamicEntry": true,
@@ -57,7 +58,7 @@
     ]
   },
   "resources/js/pages/admin/BotManagement.vue": {
-    "file": "assets/BotManagement-BW_oFFbW.js",
+    "file": "assets/BotManagement-DU4e0jn8.js",
     "name": "BotManagement",
     "src": "resources/js/pages/admin/BotManagement.vue",
     "isDynamicEntry": true,
@@ -68,7 +69,7 @@
     ]
   },
   "resources/js/pages/admin/Bots.vue": {
-    "file": "assets/Bots-Dq2x6RNG.js",
+    "file": "assets/Bots-B2PTTDDy.js",
     "name": "Bots",
     "src": "resources/js/pages/admin/Bots.vue",
     "isDynamicEntry": true,
@@ -79,7 +80,7 @@
     ]
   },
   "resources/js/pages/admin/Dashboard.vue": {
-    "file": "assets/Dashboard-CslA7udU.js",
+    "file": "assets/Dashboard-BfcwWnkp.js",
     "name": "Dashboard",
     "src": "resources/js/pages/admin/Dashboard.vue",
     "isDynamicEntry": true,
@@ -91,7 +92,7 @@
     ]
   },
   "resources/js/pages/admin/Documentation.vue": {
-    "file": "assets/Documentation-BR4w0tVe.js",
+    "file": "assets/Documentation-CnwDzTDu.js",
     "name": "Documentation",
     "src": "resources/js/pages/admin/Documentation.vue",
     "isDynamicEntry": true,
@@ -102,8 +103,21 @@
       "assets/Documentation-DK_0K_It.css"
     ]
   },
+  "resources/js/pages/admin/Logs.vue": {
+    "file": "assets/Logs-DWuv8Zyh.js",
+    "name": "Logs",
+    "src": "resources/js/pages/admin/Logs.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/admin.js",
+      "_sweetalert2.esm.all-C0u8rGqG.js"
+    ],
+    "css": [
+      "assets/Logs-DGKiWoqD.css"
+    ]
+  },
   "resources/js/pages/admin/Media.vue": {
-    "file": "assets/Media-C-YBis37.js",
+    "file": "assets/Media-ClVcrlyd.js",
     "name": "Media",
     "src": "resources/js/pages/admin/Media.vue",
     "isDynamicEntry": true,
@@ -117,7 +131,7 @@
     ]
   },
   "resources/js/pages/admin/Notifications.vue": {
-    "file": "assets/Notifications-BSNd98kj.js",
+    "file": "assets/Notifications-feGlJS0U.js",
     "name": "Notifications",
     "src": "resources/js/pages/admin/Notifications.vue",
     "isDynamicEntry": true,
@@ -127,7 +141,7 @@
     ]
   },
   "resources/js/pages/admin/Roles.vue": {
-    "file": "assets/Roles-6F66tpap.js",
+    "file": "assets/Roles-AVXRmAuY.js",
     "name": "Roles",
     "src": "resources/js/pages/admin/Roles.vue",
     "isDynamicEntry": true,
@@ -138,7 +152,7 @@
     ]
   },
   "resources/js/pages/admin/Subscription.vue": {
-    "file": "assets/Subscription-KczIZNY2.js",
+    "file": "assets/Subscription-DNFznFyq.js",
     "name": "Subscription",
     "src": "resources/js/pages/admin/Subscription.vue",
     "isDynamicEntry": true,
@@ -150,29 +164,29 @@
     ]
   },
   "resources/js/pages/admin/Support.vue": {
-    "file": "assets/Support-4QoAVfOc.js",
+    "file": "assets/Support-B-L5-0DC.js",
     "name": "Support",
     "src": "resources/js/pages/admin/Support.vue",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/admin.js",
       "_sweetalert2.esm.all-C0u8rGqG.js",
-      "_StatusBadge-DDXfu8Hi.js"
+      "_StatusBadge-CzgJHqvl.js"
     ]
   },
   "resources/js/pages/admin/SupportTicket.vue": {
-    "file": "assets/SupportTicket-bKZ1Bs9y.js",
+    "file": "assets/SupportTicket-3uXaJNLm.js",
     "name": "SupportTicket",
     "src": "resources/js/pages/admin/SupportTicket.vue",
     "isDynamicEntry": true,
     "imports": [
       "resources/js/admin.js",
       "_sweetalert2.esm.all-C0u8rGqG.js",
-      "_StatusBadge-DDXfu8Hi.js"
+      "_StatusBadge-CzgJHqvl.js"
     ]
   },
   "resources/js/pages/admin/Users.vue": {
-    "file": "assets/Users-p-0oQ7SN.js",
+    "file": "assets/Users-DDY6B-bQ.js",
     "name": "Users",
     "src": "resources/js/pages/admin/Users.vue",
     "isDynamicEntry": true,
@@ -183,7 +197,7 @@
     ]
   },
   "resources/js/pages/auth/ForgotPassword.vue": {
-    "file": "assets/ForgotPassword-C8Fu2Vwj.js",
+    "file": "assets/ForgotPassword-xqF35Jxu.js",
     "name": "ForgotPassword",
     "src": "resources/js/pages/auth/ForgotPassword.vue",
     "isDynamicEntry": true,
@@ -192,7 +206,7 @@
     ]
   },
   "resources/js/pages/auth/Login.vue": {
-    "file": "assets/Login-PszE8gjk.js",
+    "file": "assets/Login-BRVNJjiD.js",
     "name": "Login",
     "src": "resources/js/pages/auth/Login.vue",
     "isDynamicEntry": true,
@@ -201,7 +215,7 @@
     ]
   },
   "resources/js/pages/auth/Register.vue": {
-    "file": "assets/Register-BAwBr-_y.js",
+    "file": "assets/Register-CskRYIdu.js",
     "name": "Register",
     "src": "resources/js/pages/auth/Register.vue",
     "isDynamicEntry": true,
@@ -210,7 +224,7 @@
     ]
   },
   "resources/js/pages/auth/ResetPassword.vue": {
-    "file": "assets/ResetPassword-Dzp8mt8a.js",
+    "file": "assets/ResetPassword-CtVpZTlg.js",
     "name": "ResetPassword",
     "src": "resources/js/pages/auth/ResetPassword.vue",
     "isDynamicEntry": true,

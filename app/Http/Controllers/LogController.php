@@ -116,8 +116,13 @@ class LogController extends Controller
         try {
             $logFiles = $this->getLogFiles();
 
+            // Возвращаем только имена файлов для простоты использования
+            $fileNames = array_map(function ($file) {
+                return $file['name'];
+            }, $logFiles);
+
             return response()->json([
-                'files' => $logFiles,
+                'files' => $fileNames,
             ]);
         } catch (\Exception $e) {
             return response()->json([

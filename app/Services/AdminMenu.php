@@ -59,6 +59,12 @@ class AdminMenu
                 'roles' => ['admin', 'manager'],
             ],
             [
+                'title' => 'Логи',
+                'route' => 'admin.logs',
+                'icon' => 'file-text',
+                'roles' => ['admin'],
+            ],
+            [
                 'title' => 'Документация',
                 'route' => 'admin.documentation',
                 'icon' => 'book',

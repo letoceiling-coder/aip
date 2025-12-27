@@ -253,13 +253,19 @@ const routes = [
                 path: 'support',
                 name: 'admin.support',
                 component: () => import('./pages/admin/Support.vue'),
-                meta: { requiresAuth: true, requiresRole: ['admin', 'manager'], title: 'Поддержка' },
+                meta: { requiresAuth: true, requiresRole: ['admin'], title: 'Поддержка' },
             },
             {
                 path: 'support/:id',
                 name: 'admin.support.ticket',
                 component: () => import('./pages/admin/SupportTicket.vue'),
                 meta: { requiresAuth: true, requiresRole: ['admin', 'manager'], title: 'Тикет поддержки', parent: 'admin.support' },
+            },
+            {
+                path: 'logs',
+                name: 'admin.logs',
+                component: () => import('./pages/admin/Logs.vue'),
+                meta: { requiresAuth: true, requiresRole: ['admin'], title: 'Логи' },
             },
             {
                 path: 'bots',

@@ -51,7 +51,7 @@ class AdminMenu
                 'route' => 'admin.trendsso-parser',
                 'icon' => 'link',
                 'roles' => ['admin'],
-            ],
+            ], // Trend SSO Parser menu item
             [
                 'title' => 'Подписка',
                 'route' => 'admin.subscription',

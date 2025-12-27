@@ -248,11 +248,33 @@ class DeployController extends Controller
             // ВАЖНО: Это должно быть первым шагом перед всеми git командами
             $this->ensureGitSafeDirectory();
             
+            // Настройка SSH для git (решает проблему Host key verification failed)
+            $this->ensureGitSshConfig();
+            
             // Определяем безопасную директорию для всех git команд
             // Используем одинарные кавычки внутри двойных для правильного экранирования
             $safeDirectoryPath = escapeshellarg($this->basePath);
+            $knownHostsFile = $this->basePath . '/.ssh/known_hosts';
+            $sshConfigFile = $this->basePath . '/.ssh/config';
+            
+            // Настраиваем SSH для git команд
+            $sshCommand = 'ssh';
+            if (file_exists($sshConfigFile)) {
+                $sshCommand .= ' -F ' . escapeshellarg($sshConfigFile);
+            } else {
+                // Если config нет, используем параметры напрямую
+                $sshCommand .= ' -o StrictHostKeyChecking=no';
+                if (file_exists($knownHostsFile)) {
+                    $sshCommand .= ' -o UserKnownHostsFile=' . escapeshellarg($knownHostsFile);
+                } else {
+                    // Если known_hosts нет, просто отключаем проверку
+                    $sshCommand .= ' -o UserKnownHostsFile=/dev/null';
+                }
+            }
+            
             $gitEnv = [
                 'GIT_CEILING_DIRECTORIES' => dirname($this->basePath),
+                'GIT_SSH_COMMAND' => $sshCommand,
             ];
             // Формируем команду с правильным экранированием
             $gitBaseCmd = 'git -c safe.directory=' . $safeDirectoryPath;
@@ -384,6 +406,51 @@ class DeployController extends Controller
             // Игнорируем ошибки настройки - возможно, уже настроено или нет прав
             Log::warning('Не удалось настроить safe.directory для git', [
                 'path' => $this->basePath,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Настроить SSH для git команд (решает проблему Host key verification failed)
+     */
+    protected function ensureGitSshConfig(): void
+    {
+        try {
+            // Создаем директорию .ssh в проекте, если её нет
+            $projectSshDir = $this->basePath . '/.ssh';
+            if (!is_dir($projectSshDir)) {
+                mkdir($projectSshDir, 0700, true);
+            }
+
+            // Создаем known_hosts файл в проекте
+            $knownHostsFile = $projectSshDir . '/known_hosts';
+            
+            // Добавляем GitHub в known_hosts, если его там еще нет
+            if (!file_exists($knownHostsFile) || strpos(file_get_contents($knownHostsFile), 'github.com') === false) {
+                // Получаем ключи GitHub
+                $keyscanProcess = Process::run("ssh-keyscan -t rsa,ecdsa,ed25519 github.com 2>/dev/null");
+                if ($keyscanProcess->successful()) {
+                    $githubKeys = $keyscanProcess->output();
+                    file_put_contents($knownHostsFile, $githubKeys, FILE_APPEND);
+                    chmod($knownHostsFile, 0600);
+                    Log::info('GitHub ключи добавлены в known_hosts проекта');
+                }
+            }
+
+            // Настраиваем SSH config для git
+            $sshConfigFile = $projectSshDir . '/config';
+            if (!file_exists($sshConfigFile)) {
+                $sshConfig = "Host github.com\n";
+                $sshConfig .= "  StrictHostKeyChecking no\n";
+                $sshConfig .= "  UserKnownHostsFile " . $knownHostsFile . "\n";
+                $sshConfig .= "  IdentityFile ~/.ssh/id_ed25519\n";
+                file_put_contents($sshConfigFile, $sshConfig);
+                chmod($sshConfigFile, 0600);
+                Log::info('SSH config создан для git');
+            }
+        } catch (\Exception $e) {
+            Log::warning('Не удалось настроить SSH для git', [
                 'error' => $e->getMessage(),
             ]);
         }

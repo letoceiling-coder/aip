@@ -12,6 +12,7 @@ class BotMaterialCategory extends Model
         'bot_id',
         'name',
         'description',
+        'external_url',
         'order_index',
         'is_active',
     ];

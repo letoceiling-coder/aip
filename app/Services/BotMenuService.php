@@ -19,7 +19,7 @@ class BotMenuService
 
         $materialsButton = $menu['materials_button'] ?? '📂 Полезные материалы и договоры';
         $consultationButton = $menu['consultation_button'] ?? '📞 Записаться на консультацию';
-        $reviewButton = $menu['review_button'] ?? '⭐ Оставить отзыв на Яндекс Картах';
+        $reviewButton = $menu['review_button'] ?? 'Оставь отзыв на Яндекс Картах';
 
         $keyboard = [
             [
@@ -51,9 +51,17 @@ class BotMenuService
 
         $keyboard = [];
         foreach ($categories as $category) {
-            $keyboard[] = [
-                ['text' => $category->name, 'callback_data' => BotActions::MATERIAL_CATEGORY . $category->id],
-            ];
+            if ($category->external_url) {
+                // Если есть external_url, используем web_app для открытия в Mini App
+                $keyboard[] = [
+                    ['text' => $category->name, 'web_app' => ['url' => $category->external_url]],
+                ];
+            } else {
+                // Если нет external_url, используем callback_data (старая логика)
+                $keyboard[] = [
+                    ['text' => $category->name, 'callback_data' => BotActions::MATERIAL_CATEGORY . $category->id],
+                ];
+            }
         }
 
         $keyboard[] = [

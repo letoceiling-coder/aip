@@ -47,25 +47,6 @@ class AdminMenu
                 'roles' => ['admin'],
             ],
             [
-                'title' => 'Конфигурации',
-                'icon' => 'settings',
-                'roles' => ['admin'],
-                'children' => [
-                    [
-                        'title' => 'Бот',
-                        'route' => 'admin.settings.bot',
-                        'icon' => 'bot',
-                        'roles' => ['admin'],
-                    ],
-                    [
-                        'title' => 'Telegram Stars',
-                        'route' => 'admin.settings.stars',
-                        'icon' => 'star',
-                        'roles' => ['admin', 'superadmin'],
-                    ],
-                ],
-            ],
-            [
                 'title' => 'Подписка',
                 'route' => 'admin.subscription',
                 'icon' => 'credit-card',

@@ -1,54 +1,4 @@
-<template>
-    <div class="documentation-page">
-        <div class="mb-6">
-            <h1 class="text-2xl font-bold text-foreground">Документация</h1>
-            <p class="text-muted-foreground mt-1">Техническая документация системы</p>
-        </div>
-
-        <div class="space-y-6">
-            <!-- Навигация по разделам -->
-            <div class="bg-card rounded-lg border border-border p-4">
-                <h2 class="text-lg font-semibold mb-4">Разделы документации</h2>
-                <nav class="flex flex-wrap gap-2">
-                    <button
-                        v-for="section in sections"
-                        :key="section.id"
-                        @click="activeSection = section.id"
-                        :class="[
-                            'px-4 py-2 rounded-lg text-sm font-medium transition-colors',
-                            activeSection === section.id
-                                ? 'bg-primary text-primary-foreground'
-                                : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                        ]"
-                    >
-                        {{ section.title }}
-                    </button>
-                </nav>
-            </div>
-
-            <!-- Содержимое документации -->
-            <div class="bg-card rounded-lg border border-border p-6">
-                <div v-html="currentContent" class="prose prose-sm max-w-none dark:prose-invert"></div>
-            </div>
-        </div>
-    </div>
-</template>
-
-<script>
-export default {
-    name: 'Documentation',
-    data() {
-        return {
-            activeSection: 'overview',
-            sections: [
-                { id: 'overview', title: 'Обзор системы' },
-                { id: 'api', title: 'API Endpoints' },
-                { id: 'admin', title: 'Админ-панель' },
-                { id: 'bots', title: 'Управление ботами' },
-                { id: 'deployment', title: 'Деплой' },
-            ],
-            documentation: {
-                overview: `
+import{_ as e,c as s,a as i,F as g,q as a,o as r,p as d,t as p}from"./admin-DOSAmZkU.js";const h={name:"Documentation",data(){return{activeSection:"overview",sections:[{id:"overview",title:"Обзор системы"},{id:"api",title:"API Endpoints"},{id:"admin",title:"Админ-панель"},{id:"bots",title:"Управление ботами"},{id:"deployment",title:"Деплой"}],documentation:{overview:`
                     <h2>Обзор системы</h2>
                     <p>Backend система для Telegram Mini App приложений на базе Laravel 11.</p>
 
@@ -73,8 +23,7 @@ export default {
                         <li><strong>Авторизация:</strong> Laravel Sanctum</li>
                         <li><strong>Интеграции:</strong> Telegram Bot API</li>
                     </ul>
-                `,
-                api: `
+                `,api:`
                     <h2>API Endpoints</h2>
                     <p>Все API endpoints используют префикс <code>/api</code>.</p>
 
@@ -161,8 +110,7 @@ export default {
                     <ul>
                         <li><strong>GET /api/admin/menu</strong> - Получить меню админ-панели (с фильтрацией по ролям)</li>
                     </ul>
-                `,
-                admin: `
+                `,admin:`
                     <h2>Админ-панель</h2>
                     <p>Админ-панель доступна по адресу <code>/admin</code> и требует авторизации.</p>
 
@@ -201,8 +149,7 @@ export default {
                         <li>Интеграция с внешними CRM системами</li>
                         <li>Webhooks для получения сообщений от внешних систем</li>
                     </ul>
-                `,
-                bots: `
+                `,bots:`
                     <h2>Управление Telegram-ботами</h2>
                     <p>Полное руководство для администраторов по работе с Telegram-ботом через админ-панель.</p>
 
@@ -470,8 +417,7 @@ export default {
                         </li>
                         <li>Проверьте логи ошибок</li>
                     </ol>
-                `,
-                deployment: `
+                `,deployment:`
                     <h2>Автоматический деплой</h2>
                     <p>Система поддерживает автоматическое развертывание кода на сервере через несколько методов.</p>
 
@@ -506,59 +452,4 @@ export default {
                         <li><code>DEPLOY_TOKEN</code> - Токен для авторизации деплоя</li>
                         <li><code>DEPLOY_SERVER_URL</code> - URL сервера (опционально, для локальных деплоев)</li>
                     </ul>
-                `,
-            },
-        };
-    },
-    computed: {
-        currentContent() {
-            return this.documentation[this.activeSection] || '<p>Раздел в разработке</p>';
-        },
-    },
-};
-</script>
-
-<style scoped>
-.documentation-page {
-    min-height: 100vh;
-}
-
-.prose {
-    color: inherit;
-}
-
-.prose h2 {
-    margin-top: 2rem;
-    margin-bottom: 1rem;
-    font-size: 1.5rem;
-    font-weight: 700;
-}
-
-.prose h3 {
-    margin-top: 1.5rem;
-    margin-bottom: 0.75rem;
-    font-size: 1.25rem;
-    font-weight: 600;
-}
-
-.prose ul {
-    margin: 1rem 0;
-    padding-left: 1.5rem;
-}
-
-.prose li {
-    margin: 0.5rem 0;
-}
-
-.prose code {
-    background-color: rgba(0, 0, 0, 0.05);
-    padding: 0.125rem 0.25rem;
-    border-radius: 0.25rem;
-    font-family: 'Courier New', monospace;
-    font-size: 0.875em;
-}
-
-.dark .prose code {
-    background-color: rgba(255, 255, 255, 0.1);
-}
-</style>
+                `}}},computed:{currentContent(){return this.documentation[this.activeSection]||"<p>Раздел в разработке</p>"}}},u={class:"documentation-page"},c={class:"space-y-6"},m={class:"bg-card rounded-lg border border-border p-4"},T={class:"flex flex-wrap gap-2"},b=["onClick"],E={class:"bg-card rounded-lg border border-border p-6"},v=["innerHTML"];function P(S,l,f,k,t,n){return r(),s("div",u,[l[1]||(l[1]=i("div",{class:"mb-6"},[i("h1",{class:"text-2xl font-bold text-foreground"},"Документация"),i("p",{class:"text-muted-foreground mt-1"},"Техническая документация системы")],-1)),i("div",c,[i("div",m,[l[0]||(l[0]=i("h2",{class:"text-lg font-semibold mb-4"},"Разделы документации",-1)),i("nav",T,[(r(!0),s(g,null,a(t.sections,o=>(r(),s("button",{key:o.id,onClick:_=>t.activeSection=o.id,class:d(["px-4 py-2 rounded-lg text-sm font-medium transition-colors",t.activeSection===o.id?"bg-primary text-primary-foreground":"bg-muted text-muted-foreground hover:bg-muted/80"])},p(o.title),11,b))),128))])]),i("div",E,[i("div",{innerHTML:n.currentContent,class:"prose prose-sm max-w-none dark:prose-invert"},null,8,v)])])])}const L=e(h,[["render",P],["__scopeId","data-v-a5e32928"]]);export{L as default};

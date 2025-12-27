@@ -56,11 +56,11 @@ class DeployController extends Controller
             
             Log::info("🌿 Используется ветка для деплоя: {$requestedBranch}");
 
+            // Получаем текущий commit hash ДО обновления
+            $oldCommitHash = $this->getCurrentCommitHash();
+
             // 1. Git pull
             $gitPullResult = $this->handleGitPull($requestedBranch);
-            
-            // Получаем текущий commit hash ПОСЛЕ настройки безопасной директории
-            $oldCommitHash = $this->getCurrentCommitHash();
             $result['data']['git_pull'] = $gitPullResult['status'];
             $result['data']['branch'] = $gitPullResult['branch'] ?? 'unknown';
             if (!$gitPullResult['success']) {
@@ -284,14 +284,14 @@ class DeployController extends Controller
             Log::info("📦 Commit до обновления: " . ($beforeCommit ?: 'не определен'));
             Log::info("🌿 Обновляем ветку: {$branch}");
 
-            // 1. Получаем последние изменения из репозитория
-            Log::info("📥 Выполняем git fetch origin {$branch}...");
+            // 1. Получаем последние изменения из репозитория (с depth=0 для получения всех коммитов)
+            Log::info("📥 Выполняем git fetch --depth=0 origin {$branch}...");
             $fetchProcess = Process::path($this->basePath)
                 ->env($gitEnv)
-                ->run($gitBaseCmd . ' fetch origin ' . escapeshellarg($branch) . ' 2>&1');
+                ->run($gitBaseCmd . ' fetch --depth=0 origin ' . escapeshellarg($branch) . ' 2>&1');
 
             if (!$fetchProcess->successful()) {
-                $error = "Не удалось выполнить git fetch: " . $fetchProcess->errorOutput();
+                $error = "Не удалось выполнить git fetch: " . ($fetchProcess->errorOutput() ?: $fetchProcess->output());
                 Log::error($error);
                 return [
                     'success' => false,
@@ -302,48 +302,37 @@ class DeployController extends Controller
             }
             
             Log::info('✅ Git fetch выполнен успешно');
-
-            // 2. Переключаемся на нужную ветку (если не на ней)
-            Log::info("🔧 Переключаемся на ветку {$branch}...");
-            $checkoutProcess = Process::path($this->basePath)
-                ->env($gitEnv)
-                ->run($gitBaseCmd . ' checkout ' . escapeshellarg($branch) . ' 2>&1');
             
-            if (!$checkoutProcess->successful()) {
-                // Если локальной ветки нет, создаем ее и переключаемся
-                Log::info("🌿 Создаем локальную ветку {$branch}...");
-                $checkoutProcess = Process::path($this->basePath)
-                    ->env($gitEnv)
-                    ->run($gitBaseCmd . ' checkout -b ' . escapeshellarg($branch) . ' origin/' . escapeshellarg($branch) . ' 2>&1');
-                
-                if (!$checkoutProcess->successful()) {
-                    // Если не получилось создать из origin, создаем без tracking
-                    $checkoutProcess = Process::path($this->basePath)
-                        ->env($gitEnv)
-                        ->run($gitBaseCmd . ' checkout -b ' . escapeshellarg($branch) . ' 2>&1');
-                }
+            // Проверяем коммит из FETCH_HEAD
+            $fetchHeadProcess = Process::path($this->basePath)
+                ->env($gitEnv)
+                ->run($gitBaseCmd . ' rev-parse FETCH_HEAD 2>&1');
+            
+            if ($fetchHeadProcess->successful()) {
+                $fetchHeadCommit = trim($fetchHeadProcess->output());
+                Log::info("📦 Коммит из FETCH_HEAD: " . substr($fetchHeadCommit, 0, 7));
             }
 
-            // 3. Сбрасываем локальную ветку на origin/{branch} (принудительное обновление)
-            Log::info("🔄 Выполняем git reset --hard origin/{$branch}...");
+            // 2. Сбрасываем локальную ветку на FETCH_HEAD (для shallow clone это единственный способ)
+            Log::info("🔄 Выполняем git reset --hard FETCH_HEAD...");
             $process = Process::path($this->basePath)
                 ->env($gitEnv)
-                ->run($gitBaseCmd . ' reset --hard origin/' . escapeshellarg($branch) . ' 2>&1');
+                ->run($gitBaseCmd . ' reset --hard FETCH_HEAD 2>&1');
 
             if (!$process->successful()) {
-                Log::warning("Git reset --hard origin/{$branch} не удался, пробуем FETCH_HEAD", [
+                Log::warning("Git reset --hard FETCH_HEAD не удался, пробуем origin/{$branch}", [
                     'output' => $process->output(),
                     'error' => $process->errorOutput(),
                 ]);
 
-                // Для shallow clone используем FETCH_HEAD
-                Log::info("🔄 Пробуем git reset --hard FETCH_HEAD...");
+                // Пробуем через origin/branch (на случай если не shallow)
+                Log::info("🔄 Пробуем git reset --hard origin/{$branch}...");
                 $process = Process::path($this->basePath)
                     ->env($gitEnv)
-                    ->run($gitBaseCmd . ' reset --hard FETCH_HEAD 2>&1');
+                    ->run($gitBaseCmd . ' reset --hard origin/' . escapeshellarg($branch) . ' 2>&1');
                 
                 if (!$process->successful()) {
-                    Log::warning('Git reset --hard FETCH_HEAD не удался, пробуем git pull', [
+                    Log::warning("Git reset --hard origin/{$branch} не удался, пробуем git pull", [
                         'output' => $process->output(),
                         'error' => $process->errorOutput(),
                     ]);
@@ -353,10 +342,10 @@ class DeployController extends Controller
                         ->env($gitEnv)
                         ->run($gitBaseCmd . ' pull origin ' . escapeshellarg($branch) . ' --no-rebase --force 2>&1');
                 } else {
-                    Log::info('✅ Git reset --hard FETCH_HEAD выполнен успешно');
+                    Log::info("✅ Git reset --hard origin/{$branch} выполнен успешно");
                 }
             } else {
-                Log::info("✅ Git reset --hard origin/{$branch} выполнен успешно");
+                Log::info('✅ Git reset --hard FETCH_HEAD выполнен успешно');
             }
 
             // 3. Получаем новый commit после обновления

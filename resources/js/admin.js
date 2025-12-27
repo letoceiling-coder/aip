@@ -267,6 +267,12 @@ const routes = [
                 component: () => import('./pages/admin/Bots.vue'),
                 meta: { requiresAuth: true, requiresRole: ['admin'], title: 'Боты' },
             },
+            {
+                path: 'bots/:botId',
+                name: 'admin.bots.management',
+                component: () => import('./pages/admin/BotManagement.vue'),
+                meta: { requiresAuth: true, requiresRole: ['admin'], title: 'Управление ботом' },
+            },
         ],
     },
 ];

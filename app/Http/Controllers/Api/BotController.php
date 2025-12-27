@@ -305,51 +305,20 @@ class BotController extends Controller
             // Получаем обновление от Telegram
             $update = $request->all();
             
-            \Illuminate\Support\Facades\Log::info('📨 Telegram update received', [
-                'bot_id' => $bot->id,
-                'bot_name' => $bot->name,
+            \Illuminate\Support\Facades\Log::channel('bot')->info("Bot {$bot->id} received update", [
                 'update_id' => $update['update_id'] ?? null,
-                'message_type' => $this->getUpdateType($update),
-                'update' => $update,
+                'type' => $this->getUpdateType($update),
             ]);
             
-            // Обработка сообщений
-            if (isset($update['message'])) {
-                $message = $update['message'];
-                $chatId = $message['chat']['id'] ?? null;
-                $text = $message['text'] ?? null;
-                
-                \Illuminate\Support\Facades\Log::info('💬 Message received', [
-                    'bot_id' => $bot->id,
-                    'chat_id' => $chatId,
-                    'text' => $text,
-                    'from' => $message['from'] ?? null,
+            // Обработка через BotHandlerService
+            try {
+                $handler = app(\App\Services\BotHandlerService::class);
+                $handler->handleUpdate($bot, $update);
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::channel('bot')->error("Error handling update for bot {$bot->id}", [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
                 ]);
-                
-                // Обработка команды /start
-                if ($text === '/start' || str_starts_with($text, '/start')) {
-                    \Illuminate\Support\Facades\Log::info('🚀 /start command received', [
-                        'bot_id' => $bot->id,
-                        'chat_id' => $chatId,
-                    ]);
-                    
-                    // Отправляем приветственное сообщение
-                    if ($bot->welcome_message) {
-                        $this->telegramService->sendMessage(
-                            $bot->token,
-                            $chatId,
-                            $bot->welcome_message
-                        );
-                        \Illuminate\Support\Facades\Log::info('✅ Welcome message sent', [
-                            'bot_id' => $bot->id,
-                            'chat_id' => $chatId,
-                        ]);
-                    } else {
-                        \Illuminate\Support\Facades\Log::info('ℹ️ No welcome message configured', [
-                            'bot_id' => $bot->id,
-                        ]);
-                    }
-                }
             }
             
             return response()->json(['ok' => true], 200);

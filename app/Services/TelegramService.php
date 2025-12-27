@@ -274,5 +274,287 @@ class TelegramService
             ];
         }
     }
+
+    /**
+     * Отправить сообщение с клавиатурой
+     */
+    public function sendMessageWithKeyboard(
+        string $token,
+        int|string $chatId,
+        string $text,
+        array $keyboard = [],
+        array $options = []
+    ): array {
+        $params = array_merge($options, [
+            'reply_markup' => !empty($keyboard) ? json_encode([
+                'inline_keyboard' => $keyboard,
+            ]) : null,
+        ]);
+        
+        return $this->sendMessage($token, $chatId, $text, $params);
+    }
+
+    /**
+     * Отправить документ
+     */
+    public function sendDocument(
+        string $token,
+        int|string $chatId,
+        string $filePath,
+        ?string $caption = null,
+        array $options = []
+    ): array {
+        try {
+            if (!file_exists($filePath)) {
+                return [
+                    'success' => false,
+                    'message' => 'Файл не найден',
+                ];
+            }
+
+            $params = [
+                'chat_id' => $chatId,
+            ];
+            
+            if ($caption !== null) {
+                $params['caption'] = $caption;
+            }
+
+            $params = array_merge($params, $options);
+
+            // Используем multipart/form-data для загрузки файла
+            $response = Http::timeout(30)
+                ->attach('document', file_get_contents($filePath), basename($filePath))
+                ->asMultipart()
+                ->post($this->apiBaseUrl . $token . '/sendDocument', $params);
+            
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                if ($data['ok'] ?? false) {
+                    return [
+                        'success' => true,
+                        'data' => $data['result'] ?? [],
+                    ];
+                }
+                
+                return [
+                    'success' => false,
+                    'message' => $data['description'] ?? 'Не удалось отправить документ',
+                ];
+            }
+            
+            return [
+                'success' => false,
+                'message' => 'Ошибка подключения к Telegram API',
+            ];
+        } catch (\Exception $e) {
+            Log::error('Telegram sendDocument error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Ошибка: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Отправить документ по file_id (Telegram)
+     */
+    public function sendDocumentByFileId(
+        string $token,
+        int|string $chatId,
+        string $fileId,
+        ?string $caption = null
+    ): array {
+        try {
+            $params = [
+                'chat_id' => $chatId,
+                'document' => $fileId,
+            ];
+            
+            if ($caption !== null) {
+                $params['caption'] = $caption;
+            }
+
+            $response = Http::timeout(10)->post($this->apiBaseUrl . $token . '/sendDocument', $params);
+            
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                if ($data['ok'] ?? false) {
+                    return [
+                        'success' => true,
+                        'data' => $data['result'] ?? [],
+                    ];
+                }
+                
+                return [
+                    'success' => false,
+                    'message' => $data['description'] ?? 'Не удалось отправить документ',
+                ];
+            }
+            
+            return [
+                'success' => false,
+                'message' => 'Ошибка подключения к Telegram API',
+            ];
+        } catch (\Exception $e) {
+            Log::error('Telegram sendDocumentByFileId error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Ошибка: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Получить информацию об участнике чата/канала
+     */
+    public function getChatMember(
+        string $token,
+        int|string $chatId,
+        int $userId
+    ): array {
+        try {
+            $response = Http::timeout(10)->post($this->apiBaseUrl . $token . '/getChatMember', [
+                'chat_id' => $chatId,
+                'user_id' => $userId,
+            ]);
+            
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                if ($data['ok'] ?? false) {
+                    return [
+                        'success' => true,
+                        'data' => $data['result'] ?? [],
+                    ];
+                }
+                
+                return [
+                    'success' => false,
+                    'message' => $data['description'] ?? 'Не удалось получить информацию об участнике',
+                ];
+            }
+            
+            return [
+                'success' => false,
+                'message' => 'Ошибка подключения к Telegram API',
+            ];
+        } catch (\Exception $e) {
+            Log::error('Telegram getChatMember error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Ошибка: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Ответить на callback_query
+     */
+    public function answerCallbackQuery(
+        string $token,
+        string $callbackQueryId,
+        ?string $text = null,
+        bool $showAlert = false
+    ): array {
+        try {
+            $params = [
+                'callback_query_id' => $callbackQueryId,
+            ];
+            
+            if ($text !== null) {
+                $params['text'] = $text;
+            }
+            
+            if ($showAlert) {
+                $params['show_alert'] = true;
+            }
+
+            $response = Http::timeout(10)->post($this->apiBaseUrl . $token . '/answerCallbackQuery', $params);
+            
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                if ($data['ok'] ?? false) {
+                    return [
+                        'success' => true,
+                    ];
+                }
+                
+                return [
+                    'success' => false,
+                    'message' => $data['description'] ?? 'Не удалось ответить на callback_query',
+                ];
+            }
+            
+            return [
+                'success' => false,
+                'message' => 'Ошибка подключения к Telegram API',
+            ];
+        } catch (\Exception $e) {
+            Log::error('Telegram answerCallbackQuery error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Ошибка: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Редактировать текст сообщения
+     */
+    public function editMessageText(
+        string $token,
+        int|string $chatId,
+        int $messageId,
+        string $text,
+        array $keyboard = [],
+        array $options = []
+    ): array {
+        try {
+            $params = array_merge([
+                'chat_id' => $chatId,
+                'message_id' => $messageId,
+                'text' => $text,
+            ], $options);
+            
+            if (!empty($keyboard)) {
+                $params['reply_markup'] = json_encode([
+                    'inline_keyboard' => $keyboard,
+                ]);
+            }
+
+            $response = Http::timeout(10)->post($this->apiBaseUrl . $token . '/editMessageText', $params);
+            
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                if ($data['ok'] ?? false) {
+                    return [
+                        'success' => true,
+                        'data' => $data['result'] ?? [],
+                    ];
+                }
+                
+                return [
+                    'success' => false,
+                    'message' => $data['description'] ?? 'Не удалось отредактировать сообщение',
+                ];
+            }
+            
+            return [
+                'success' => false,
+                'message' => 'Ошибка подключения к Telegram API',
+            ];
+        } catch (\Exception $e) {
+            Log::error('Telegram editMessageText error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Ошибка: ' . $e->getMessage(),
+            ];
+        }
+    }
 }
 

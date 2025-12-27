@@ -60,6 +60,36 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('bots/{id}/check-webhook', [BotController::class, 'checkWebhook']);
             Route::post('bots/{id}/register-webhook', [BotController::class, 'registerWebhook']);
             
+            // Bot Management (detailed management)
+            Route::prefix('bot-management/{botId}')->group(function () {
+                // Заявки
+                Route::get('consultations', [\App\Http\Controllers\Api\BotManagementController::class, 'getConsultations']);
+                Route::get('consultations/{id}', [\App\Http\Controllers\Api\BotManagementController::class, 'getConsultation']);
+                Route::put('consultations/{id}', [\App\Http\Controllers\Api\BotManagementController::class, 'updateConsultation']);
+                
+                // Настройки
+                Route::get('settings', [\App\Http\Controllers\Api\BotManagementController::class, 'getSettings']);
+                Route::put('settings', [\App\Http\Controllers\Api\BotManagementController::class, 'updateSettings']);
+                
+                // Категории материалов
+                Route::get('materials/categories', [\App\Http\Controllers\Api\BotManagementController::class, 'getMaterialCategories']);
+                Route::post('materials/categories', [\App\Http\Controllers\Api\BotManagementController::class, 'storeMaterialCategory']);
+                Route::put('materials/categories/{id}', [\App\Http\Controllers\Api\BotManagementController::class, 'updateMaterialCategory']);
+                Route::delete('materials/categories/{id}', [\App\Http\Controllers\Api\BotManagementController::class, 'destroyMaterialCategory']);
+                
+                // Материалы
+                Route::get('materials', [\App\Http\Controllers\Api\BotManagementController::class, 'getMaterials']);
+                Route::post('materials', [\App\Http\Controllers\Api\BotManagementController::class, 'storeMaterial']);
+                Route::put('materials/{id}', [\App\Http\Controllers\Api\BotManagementController::class, 'updateMaterial']);
+                Route::delete('materials/{id}', [\App\Http\Controllers\Api\BotManagementController::class, 'destroyMaterial']);
+                
+                // Статистика
+                Route::get('statistics', [\App\Http\Controllers\Api\BotManagementController::class, 'getStatistics']);
+                
+                // Пользователи
+                Route::get('users', [\App\Http\Controllers\Api\BotManagementController::class, 'getUsers']);
+            });
+            
             // Support tickets
             Route::get('support/tickets', [SupportController::class, 'index']);
             Route::get('support/tickets/{id}', [SupportController::class, 'show']);

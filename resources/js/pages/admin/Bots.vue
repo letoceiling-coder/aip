@@ -83,6 +83,12 @@
                         {{ registeringWebhook === bot.id ? 'Регистрация...' : 'Установить' }}
                     </button>
                     <button
+                        @click="$router.push({ name: 'admin.bots.management', params: { botId: bot.id } })"
+                        class="px-3 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
+                    >
+                        Управление
+                    </button>
+                    <button
                         @click="editBot(bot)"
                         class="px-3 py-1 text-xs bg-yellow-500 hover:bg-yellow-600 text-white rounded transition-colors"
                     >
@@ -251,12 +257,14 @@
 
 <script>
 import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { apiGet, apiPost, apiPut, apiDelete } from '../../utils/api'
 import Swal from 'sweetalert2'
 
 export default {
     name: 'Bots',
     setup() {
+        const router = useRouter()
         const loading = ref(false)
         const saving = ref(false)
         const error = ref(null)

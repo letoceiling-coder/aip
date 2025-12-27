@@ -127,6 +127,21 @@ return [
             'path' => storage_path('logs/laravel.log'),
         ],
 
+        'bot' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/bot.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => 14,
+            'replace_placeholders' => true,
+        ],
+
+        'bot_errors' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/bot_errors.log'),
+            'level' => 'error',
+            'days' => 30,
+            'replace_placeholders' => true,
+        ],
 
     ],
 

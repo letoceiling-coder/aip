@@ -30,9 +30,19 @@ class IntegrationService
     public function sendTicketToCrm(SupportTicket $ticket, array $attachments = []): ?string
     {
         if (!$this->deployToken) {
-            Log::channel('tickets')->error('DEPLOY_TOKEN not configured');
+            Log::channel('tickets')->error('CRM API token not configured', [
+                'crm_api_token_set' => !empty(config('app.crm_api_token') ?: env('CRM_API_TOKEN')),
+                'deploy_token_set' => !empty(config('app.deploy_token') ?: env('DEPLOY_TOKEN')),
+            ]);
             return null;
         }
+
+        Log::channel('tickets')->debug('Attempting to send ticket to CRM', [
+            'ticket_id' => $ticket->id,
+            'crm_url' => $this->crmUrl,
+            'token_length' => strlen($this->deployToken),
+            'has_attachments' => !empty($attachments),
+        ]);
 
         try {
             // Используем новый API интеграции (внутри v1 префикса)

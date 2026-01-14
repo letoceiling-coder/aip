@@ -42,10 +42,18 @@
                             Редактировать
                         </button>
                         <button
+                            v-if="!category.media_id"
                             @click="selectCategoryFile(category)"
                             class="px-3 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded"
                         >
                             📎 Файл
+                        </button>
+                        <button
+                            v-else
+                            @click="removeCategoryFile(category)"
+                            class="px-3 py-1 text-xs bg-orange-500 hover:bg-orange-600 text-white rounded"
+                        >
+                            🗑️ Удалить файл
                         </button>
                         <button
                             @click="deleteCategory(category)"
@@ -121,6 +129,68 @@
                     >
                         Отмена
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Media Picker Modal -->
+        <div v-if="showMediaPicker" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4">
+            <div class="bg-background border border-border rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+                <div class="p-6 border-b border-border">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-lg font-semibold">Выберите файл из медиа-библиотеки</h3>
+                        <button @click="showMediaPicker = false; selectedCategoryForFile = null; mediaSearch = ''; mediaFiles = []" class="text-muted-foreground hover:text-foreground">
+                            ✕
+                        </button>
+                    </div>
+                    <input
+                        v-model="mediaSearch"
+                        @input="fetchMediaFiles"
+                        type="text"
+                        placeholder="Поиск файла..."
+                        class="w-full mt-4 h-10 px-3 border border-border rounded-lg bg-background"
+                    />
+                </div>
+                <div class="flex-1 overflow-y-auto p-6">
+                    <div v-if="loadingMedia" class="text-center py-12">
+                        <p class="text-muted-foreground">Загрузка файлов...</p>
+                    </div>
+                    <div v-else-if="mediaFiles.length === 0" class="text-center py-12 text-muted-foreground">
+                        Файлы не найдены
+                    </div>
+                    <div v-else class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div
+                            v-for="media in mediaFiles"
+                            :key="media.id"
+                            @click="selectMedia(media)"
+                            :class="[
+                                'p-4 border rounded-lg cursor-pointer transition-colors',
+                                selectedCategoryForFile?.media_id === media.id
+                                    ? 'border-accent bg-accent/10'
+                                    : 'border-border hover:bg-muted/10'
+                            ]"
+                        >
+                            <div class="text-sm font-medium truncate">{{ media.original_name || media.name }}</div>
+                            <div class="text-xs text-muted-foreground mt-1">{{ formatFileSize(media.size) }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-6 border-t border-border flex items-center justify-between">
+                    <button
+                        v-if="selectedCategoryForFile?.media_id"
+                        @click="removeCategoryFile(selectedCategoryForFile)"
+                        class="px-4 py-2 text-sm bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 rounded-lg"
+                    >
+                        Удалить файл
+                    </button>
+                    <div class="flex gap-2 ml-auto">
+                        <button
+                            @click="showMediaPicker = false; selectedCategoryForFile = null; mediaSearch = ''; mediaFiles = []"
+                            class="px-4 py-2 text-sm border border-border rounded-lg hover:bg-muted/10"
+                        >
+                            Отмена
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -379,68 +449,125 @@ export default {
             showMaterialForm.value = true
         }
 
+        const showMediaPicker = ref(false)
+        const selectedCategoryForFile = ref(null)
+        const loadingMedia = ref(false)
+        const mediaSearch = ref('')
+        const mediaFiles = ref([])
+
         const selectCategoryFile = async (category) => {
-            // Загружаем список файлов из медиа-библиотеки
+            selectedCategoryForFile.value = category
+            showMediaPicker.value = true
+            await fetchMediaFiles()
+        }
+
+        const fetchMediaFiles = async () => {
+            loadingMedia.value = true
             try {
-                const response = await apiGet('/media', { per_page: 100 })
-                if (!response.ok) {
+                const params = {
+                    per_page: 100,
+                }
+                if (mediaSearch.value) {
+                    params.search = mediaSearch.value
+                }
+                // Загружаем файлы из всех папок (без folder_id)
+                const response = await apiGet('/media', params)
+                if (response.ok) {
+                    const data = await response.json()
+                    // Обрабатываем пагинированный ответ
+                    if (data.data && Array.isArray(data.data)) {
+                        mediaFiles.value = data.data
+                    } else if (Array.isArray(data)) {
+                        mediaFiles.value = data
+                    } else {
+                        mediaFiles.value = []
+                    }
+                } else {
                     throw new Error('Ошибка загрузки медиа-файлов')
                 }
+            } catch (err) {
+                console.error('Error fetching media:', err)
+                Swal.fire({
+                    title: 'Ошибка',
+                    text: err.message || 'Ошибка загрузки файлов',
+                    icon: 'error',
+                })
+            } finally {
+                loadingMedia.value = false
+            }
+        }
 
-                const data = await response.json()
-                const mediaFiles = data.data || []
+        const selectMedia = async (media) => {
+            if (!selectedCategoryForFile.value) return
 
-                // Показываем список файлов для выбора
-                const { value: selectedMediaId } = await Swal.fire({
-                    title: 'Выберите файл',
-                    html: `
-                        <select id="swal-media" class="swal2-select" style="width: 100%; padding: 8px; margin-top: 10px;">
-                            <option value="">-- Без файла --</option>
-                            ${mediaFiles.map(media => 
-                                `<option value="${media.id}" ${category.media_id === media.id ? 'selected' : ''}>${media.name} (${(media.size / 1024).toFixed(2)} KB)</option>`
-                            ).join('')}
-                        </select>
-                    `,
-                    focusConfirm: false,
-                    showCancelButton: true,
-                    confirmButtonText: 'Сохранить',
-                    cancelButtonText: 'Отмена',
-                    preConfirm: () => {
-                        const select = document.getElementById('swal-media')
-                        return select ? select.value : null
-                    },
+            try {
+                const response = await apiPut(`/bot-management/${props.botId}/materials/categories/${selectedCategoryForFile.value.id}`, {
+                    media_id: media.id,
                 })
 
-                if (selectedMediaId !== undefined) {
-                    const mediaId = selectedMediaId ? parseInt(selectedMediaId) : null
-                    
-                    // Обновляем категорию
-                    const response = await apiPut(`/bot-management/${props.botId}/materials/categories/${category.id}`, {
-                        media_id: mediaId,
-                    })
-
-                    if (!response.ok) {
-                        throw new Error('Ошибка обновления категории')
-                    }
-
-                    await Swal.fire({
-                        title: 'Сохранено',
-                        icon: 'success',
-                        timer: 2000,
-                        showConfirmButton: false,
-                        toast: true,
-                        position: 'top-end',
-                    })
-
-                    fetchCategories()
+                if (!response.ok) {
+                    throw new Error('Ошибка обновления категории')
                 }
+
+                showMediaPicker.value = false
+                selectedCategoryForFile.value = null
+                mediaSearch.value = ''
+                mediaFiles.value = []
+
+                await Swal.fire({
+                    title: 'Сохранено',
+                    icon: 'success',
+                    timer: 2000,
+                    showConfirmButton: false,
+                    toast: true,
+                    position: 'top-end',
+                })
+
+                fetchCategories()
             } catch (err) {
                 Swal.fire({
                     title: 'Ошибка',
-                    text: err.message || 'Ошибка выбора файла',
+                    text: err.message || 'Ошибка сохранения файла',
                     icon: 'error',
                 })
             }
+        }
+
+        const removeCategoryFile = async (category) => {
+            try {
+                const response = await apiPut(`/bot-management/${props.botId}/materials/categories/${category.id}`, {
+                    media_id: null,
+                })
+
+                if (!response.ok) {
+                    throw new Error('Ошибка удаления файла')
+                }
+
+                await Swal.fire({
+                    title: 'Файл удален',
+                    icon: 'success',
+                    timer: 2000,
+                    showConfirmButton: false,
+                    toast: true,
+                    position: 'top-end',
+                })
+
+                fetchCategories()
+            } catch (err) {
+                Swal.fire({
+                    title: 'Ошибка',
+                    text: err.message || 'Ошибка удаления файла',
+                    icon: 'error',
+                })
+            }
+        }
+
+        const formatFileSize = (bytes) => {
+            if (!bytes) return '0 B'
+            const k = 1024
+            const sizes = ['B', 'KB', 'MB', 'GB']
+            const i = Math.floor(Math.log(bytes) / Math.log(k))
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
         }
 
         onMounted(() => {
@@ -462,6 +589,15 @@ export default {
             editMaterial,
             showMaterialModal,
             selectCategoryFile,
+            showMediaPicker,
+            selectedCategoryForFile,
+            loadingMedia,
+            mediaSearch,
+            mediaFiles,
+            fetchMediaFiles,
+            selectMedia,
+            removeCategoryFile,
+            formatFileSize,
         }
     },
 }

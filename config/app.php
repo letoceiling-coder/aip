@@ -150,6 +150,7 @@ return [
     |--------------------------------------------------------------------------
     */
 
+    'crm_api_token' => env('CRM_API_TOKEN'), // Отдельный ключ для CRM API (9 символов)
     'crm_url' => env('APP_CRM_URL', 'https://crm.siteaccess.ru'),
     'project_identifier' => env('APP_PROJECT_IDENTIFIER', 'wows-in'),
 

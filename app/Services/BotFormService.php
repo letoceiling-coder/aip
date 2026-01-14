@@ -52,23 +52,47 @@ class BotFormService
                 break;
                 
             case 'phone':
-                $phoneValidationStrict = $otherSettings['phone_validation_strict'] ?? false;
-                
                 if (empty(trim($value))) {
                     $errors[] = 'Телефон не может быть пустым';
-                } elseif (strlen($value) > 50) {
-                    $errors[] = 'Телефон слишком длинный';
-                } elseif ($phoneValidationStrict) {
-                    // Строгая валидация
-                    $cleaned = preg_replace('/[\s\-\(\)]/', '', $value);
-                    if (!preg_match('/^(\+7|8)[0-9]{10}$/', $cleaned)) {
-                        $errors[] = 'Телефон должен быть в формате: +7XXXXXXXXXX или 8XXXXXXXXXX';
-                    }
-                } else {
-                    // Мягкая валидация - проверяем наличие цифр
-                    if (!preg_match('/[0-9]/', $value)) {
-                        $errors[] = 'Телефон должен содержать хотя бы одну цифру';
-                    }
+                    break;
+                }
+                
+                if (strlen($value) > 50) {
+                    $errors[] = 'Телефон слишком длинный (максимум 50 символов)';
+                    break;
+                }
+                
+                // Очищаем номер от пробелов, дефисов, скобок
+                $cleaned = preg_replace('/[\s\-\(\)]/', '', trim($value));
+                
+                // Проверяем базовые форматы российских номеров
+                // +7XXXXXXXXXX (11 цифр после +7)
+                // 8XXXXXXXXXX (11 цифр после 8)
+                // 7XXXXXXXXXX (11 цифр после 7)
+                // +375XXXXXXXXX (белорусские номера)
+                // И другие международные форматы
+                
+                $isValid = false;
+                
+                // Российские номера
+                if (preg_match('/^(\+7|8|7)[0-9]{10}$/', $cleaned)) {
+                    $isValid = true;
+                }
+                // Белорусские номера
+                elseif (preg_match('/^(\+375)[0-9]{9}$/', $cleaned)) {
+                    $isValid = true;
+                }
+                // Международные номера (начинаются с +, от 10 до 15 цифр)
+                elseif (preg_match('/^\+[1-9][0-9]{9,14}$/', $cleaned)) {
+                    $isValid = true;
+                }
+                // Номера без + (только цифры, от 10 до 15)
+                elseif (preg_match('/^[1-9][0-9]{9,14}$/', $cleaned)) {
+                    $isValid = true;
+                }
+                
+                if (!$isValid) {
+                    $errors[] = 'Некорректный формат номера телефона. Используйте формат: +7XXXXXXXXXX или 8XXXXXXXXXX';
                 }
                 break;
                 

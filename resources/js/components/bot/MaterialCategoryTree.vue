@@ -36,12 +36,6 @@
                     </div>
                     <div class="flex gap-2">
                         <button
-                            @click="editCategory(category)"
-                            class="px-3 py-1 text-xs bg-yellow-500 hover:bg-yellow-600 text-white rounded"
-                        >
-                            Редактировать
-                        </button>
-                        <button
                             v-if="!category.media_id"
                             @click="selectCategoryFile(category)"
                             class="px-3 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded"
@@ -60,12 +54,6 @@
                             class="px-3 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded"
                         >
                             Удалить
-                        </button>
-                        <button
-                            @click="showMaterialModal(category)"
-                            class="px-3 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded"
-                        >
-                            + Материал
                         </button>
                     </div>
                 </div>

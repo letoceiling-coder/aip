@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-6 bg-transparent">
+  <div class="space-y-6 bg-transparent min-h-full">
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div class="flex items-center gap-4">

@@ -135,8 +135,8 @@
 
         <!-- Media Picker Modal -->
         <div v-if="showMediaPicker" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4">
-            <div class="bg-background border border-border rounded-lg shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
-                <div class="p-6 border-b border-border">
+            <div class="bg-background border border-border rounded-lg shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+                <div class="p-6 border-b border-border flex-shrink-0">
                     <div class="flex items-center justify-between">
                         <h3 class="text-lg font-semibold">Выберите файл из медиа-библиотеки</h3>
                         <button @click="showMediaPicker = false; selectedCategoryForFile = null" class="text-muted-foreground hover:text-foreground">
@@ -144,7 +144,7 @@
                         </button>
                     </div>
                 </div>
-                <div class="flex-1 overflow-hidden">
+                <div class="flex-1 overflow-y-auto min-h-0">
                     <Media
                         :selection-mode="true"
                         :count-file="1"

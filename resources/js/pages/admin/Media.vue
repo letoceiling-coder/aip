@@ -464,11 +464,11 @@
               :key="file.id"
               :class="[
                 'group bg-background border rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow flex flex-col',
-                selectionMode && (file.type === 'photo' || file.type === 'video') 
+                selectionMode
                   ? (isFileSelected(file) ? 'border-primary border-2 cursor-pointer' : 'border-border cursor-pointer hover:border-primary')
                   : 'border-border'
               ]"
-              @click="selectionMode && (file.type === 'photo' || file.type === 'video') ? openFilePreview(file) : null"
+              @click="selectionMode ? openFilePreview(file) : null"
             >
               <!-- Превью изображения -->
               <div class="relative aspect-video bg-muted/30 overflow-hidden flex-shrink-0">

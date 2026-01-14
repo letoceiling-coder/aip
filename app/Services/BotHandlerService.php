@@ -341,10 +341,17 @@ class BotHandlerService
         $messages = $settings['messages'] ?? [];
         $materials = $messages['materials'] ?? [];
 
-        $text = $materials['list_description'] ?? 
-            'Мы подготовили материалы по ключевым направлениям нашей работы.';
-
         $keyboard = $this->menu->getMaterialsListKeyboard($bot->id);
+
+        // Проверяем, есть ли категории (кроме кнопки "Назад")
+        $hasCategories = count($keyboard) > 1;
+
+        if (!$hasCategories) {
+            $text = 'К сожалению, материалы пока не добавлены. Пожалуйста, попробуйте позже.';
+        } else {
+            $text = $materials['list_description'] ?? 
+                'Мы подготовили материалы по ключевым направлениям нашей работы.';
+        }
 
         $this->telegram->sendMessageWithKeyboard(
             $bot->token,

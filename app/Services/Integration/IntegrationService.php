@@ -19,7 +19,8 @@ class IntegrationService
         $this->crmUrl = config('app.crm_url', env('APP_CRM_URL', 'https://crm.siteaccess.ru'));
         // Убираем путь из URL, если он есть
         $this->crmUrl = rtrim(preg_replace('#/api/.*$#', '', $this->crmUrl), '/');
-        $this->deployToken = config('app.deploy_token') ?: env('DEPLOY_TOKEN') ?: null;
+        // Используем отдельный ключ для CRM API (ожидается 9 символов)
+        $this->deployToken = config('app.crm_api_token') ?: env('CRM_API_TOKEN') ?: config('app.deploy_token') ?: env('DEPLOY_TOKEN') ?: null;
         $this->projectIdentifier = config('app.project_identifier', env('APP_PROJECT_IDENTIFIER', 'tma'));
     }
 

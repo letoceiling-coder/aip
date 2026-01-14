@@ -158,9 +158,6 @@ export default {
             const { value: formValues } = await Swal.fire({
                 title: 'Одобрить заявку',
                 html: `
-                    <input id="swal-email" class="swal2-input" placeholder="Email *" required>
-                    <input id="swal-name" class="swal2-input" placeholder="Имя (необязательно)">
-                    <input id="swal-password" class="swal2-input" type="password" placeholder="Пароль (необязательно, будет сгенерирован)">
                     <textarea id="swal-notes" class="swal2-textarea" placeholder="Примечание (необязательно)"></textarea>
                 `,
                 focusConfirm: false,
@@ -168,20 +165,8 @@ export default {
                 confirmButtonText: 'Одобрить',
                 cancelButtonText: 'Отмена',
                 preConfirm: () => {
-                    const email = document.getElementById('swal-email').value
-                    const name = document.getElementById('swal-name').value
-                    const password = document.getElementById('swal-password').value
                     const notes = document.getElementById('swal-notes').value
-
-                    if (!email) {
-                        Swal.showValidationMessage('Email обязателен')
-                        return false
-                    }
-
                     return {
-                        email,
-                        name: name || null,
-                        password: password || null,
                         admin_notes: notes || null,
                     }
                 },

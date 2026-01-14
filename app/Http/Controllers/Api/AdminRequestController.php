@@ -87,9 +87,6 @@ class AdminRequestController extends Controller
         }
 
         $validated = $request->validate([
-            'email' => 'required|email|max:255',
-            'name' => 'nullable|string|max:255',
-            'password' => 'nullable|string|min:8',
             'admin_notes' => 'nullable|string',
         ]);
 
@@ -102,17 +99,18 @@ class AdminRequestController extends Controller
                 throw new \Exception('Роль администратора не найдена');
             }
 
-            // Создаем или находим пользователя
-            $user = User::where('email', $validated['email'])->first();
+            // Создаем или находим пользователя с автоматически сгенерированным email
+            $email = "telegram_{$adminRequest->telegram_user_id}@telegram.local";
+            $user = User::where('email', $email)->first();
 
             if (!$user) {
                 // Создаем нового пользователя
-                $name = $validated['name'] ?? $adminRequest->full_name;
-                $password = $validated['password'] ?? Str::random(12);
+                $name = $adminRequest->full_name;
+                $password = Str::random(16); // Генерируем случайный пароль
 
                 $user = User::create([
                     'name' => $name,
-                    'email' => $validated['email'],
+                    'email' => $email,
                     'password' => Hash::make($password),
                 ]);
             }
@@ -120,6 +118,14 @@ class AdminRequestController extends Controller
             // Назначаем роль администратора
             if (!$user->hasRole('admin')) {
                 $user->roles()->syncWithoutDetaching([$adminRole->id]);
+            }
+
+            // Добавляем telegram_user_id в admin_telegram_ids бота (если еще не добавлен)
+            $bot = $adminRequest->bot;
+            $adminTelegramIds = $bot->admin_telegram_ids ?? [];
+            if (!in_array($adminRequest->telegram_user_id, $adminTelegramIds)) {
+                $adminTelegramIds[] = $adminRequest->telegram_user_id;
+                $bot->update(['admin_telegram_ids' => $adminTelegramIds]);
             }
 
             // Обновляем заявку
@@ -133,7 +139,7 @@ class AdminRequestController extends Controller
             DB::commit();
 
             // Отправляем уведомление в Telegram
-            $this->sendApprovalNotification($adminRequest->bot, $adminRequest->telegram_user_id, $user);
+            $this->sendApprovalNotification($adminRequest->bot, $adminRequest->telegram_user_id);
 
             return response()->json([
                 'success' => true,
@@ -192,15 +198,13 @@ class AdminRequestController extends Controller
     /**
      * Отправить уведомление об одобрении
      */
-    protected function sendApprovalNotification(Bot $bot, int $telegramUserId, User $user): void
+    protected function sendApprovalNotification(Bot $bot, int $telegramUserId): void
     {
         $message = "🎉 Поздравляем!\n\n" .
-            "Ваша заявка на назначение администратором была одобрена.\n\n" .
-            "Вам назначена роль администратора в системе.\n" .
-            "Email: {$user->email}\n\n" .
-            "Теперь вы можете войти в админ-панель и управлять системой.";
+            "Ваша заявка на назначение администратором бота <b>{$bot->name}</b> была одобрена.\n\n" .
+            "Вам назначена роль администратора. Теперь вы можете управлять ботом через админ-панель.";
 
-        $this->telegram->sendMessage($bot->token, $telegramUserId, $message);
+        $this->telegram->sendMessage($bot->token, $telegramUserId, $message, ['parse_mode' => 'HTML']);
     }
 
     /**

@@ -107,8 +107,8 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 });
 
-// Integration API (protected by deploy.token middleware)
-Route::middleware('deploy.token')->prefix('integration')->group(function () {
+// Integration API (protected by crm.integration middleware - accepts CRM_API_TOKEN)
+Route::middleware('crm.integration')->prefix('integration')->group(function () {
     Route::post('/messages', [\App\Http\Controllers\Api\IntegrationController::class, 'receiveMessage']);
     Route::post('/status', [\App\Http\Controllers\Api\IntegrationController::class, 'receiveStatusChange']);
 });

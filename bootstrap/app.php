@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
             'deploy.token' => \App\Http\Middleware\VerifyDeployToken::class,
+            'crm.integration' => \App\Http\Middleware\VerifyCrmIntegrationToken::class,
             'subscription.check' => \App\Http\Middleware\CheckSubscription::class,
         ]);
     })

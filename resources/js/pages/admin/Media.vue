@@ -508,9 +508,9 @@
                 >
                   ✓
                 </div>
-                <!-- Кнопка выбора (вместо просмотра в режиме выбора) -->
+                <!-- Кнопка выбора (в режиме выбора для всех файлов) -->
                 <button
-                  v-if="selectionMode && (file.type === 'photo' || file.type === 'video')"
+                  v-if="selectionMode"
                   @click.stop="openFilePreview(file)"
                   :class="[
                     'absolute inset-0 flex items-center justify-center transition-opacity cursor-pointer',

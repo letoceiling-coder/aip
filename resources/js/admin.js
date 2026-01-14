@@ -285,6 +285,12 @@ const routes = [
                 component: () => import('./pages/admin/TrendSsoParser.vue'),
                 meta: { requiresAuth: true, requiresRole: ['admin'], title: 'Парсер Trend SSO' },
             },
+            {
+                path: 'admin-requests',
+                name: 'admin.admin-requests',
+                component: () => import('./pages/admin/AdminRequests.vue'),
+                meta: { requiresAuth: true, requiresRole: ['admin'], title: 'Заявки на администратора' },
+            },
         ],
     },
 ];

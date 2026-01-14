@@ -6,6 +6,7 @@ use App\Constants\BotActions;
 use App\Constants\BotStates;
 use App\Models\Bot;
 use App\Models\BotUser;
+use App\Models\AdminRequest;
 use Illuminate\Support\Facades\Log;
 
 class BotHandlerService
@@ -82,6 +83,12 @@ class BotHandlerService
         // Обработка команды /start
         if ($text && (str_starts_with($text, '/start') || $text === '/start')) {
             $this->handleStartCommand($bot, $user);
+            return;
+        }
+
+        // Обработка команды /admin
+        if ($text && (str_starts_with($text, '/admin') || $text === '/admin')) {
+            $this->handleAdminCommand($bot, $user);
             return;
         }
 
@@ -188,6 +195,53 @@ class BotHandlerService
 
         // Проверяем подписку
         $this->checkSubscriptionAndProceed($bot, $user);
+    }
+
+    /**
+     * Обработать команду /admin
+     */
+    protected function handleAdminCommand(Bot $bot, BotUser $user): void
+    {
+        // Проверяем, есть ли уже активная заявка
+        $existingRequest = AdminRequest::where('bot_id', $bot->id)
+            ->where('telegram_user_id', $user->telegram_user_id)
+            ->where('status', 'pending')
+            ->first();
+
+        if ($existingRequest) {
+            $this->telegram->sendMessage(
+                $bot->token,
+                $user->telegram_user_id,
+                "⏳ У вас уже есть активная заявка на назначение администратором. Пожалуйста, дождитесь рассмотрения."
+            );
+            return;
+        }
+
+        // Создаем новую заявку
+        $request = AdminRequest::create([
+            'bot_id' => $bot->id,
+            'telegram_user_id' => $user->telegram_user_id,
+            'username' => $user->username,
+            'first_name' => $user->first_name,
+            'last_name' => $user->last_name,
+            'status' => 'pending',
+        ]);
+
+        // Отправляем подтверждение пользователю
+        $this->telegram->sendMessage(
+            $bot->token,
+            $user->telegram_user_id,
+            "✅ Заявка на назначение администратором успешно создана!\n\n" .
+            "Ваша заявка будет рассмотрена администраторами. Вы получите уведомление о результате."
+        );
+
+        // Логируем создание заявки
+        $this->logger->logMessage(
+            $bot->id,
+            $user->telegram_user_id,
+            ['text' => '/admin', 'request_id' => $request->id],
+            'admin_request_created'
+        );
     }
 
     /**

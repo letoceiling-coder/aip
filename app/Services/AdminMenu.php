@@ -47,6 +47,12 @@ class AdminMenu
                 'roles' => ['admin'],
             ],
             [
+                'title' => 'Заявки на админа',
+                'route' => 'admin.admin-requests',
+                'icon' => 'user-plus',
+                'roles' => ['admin'],
+            ],
+            [
                 'title' => 'Парсер Trend SSO',
                 'route' => 'admin.trendsso-parser',
                 'icon' => 'link',

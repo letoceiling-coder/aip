@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\BotController;
 use App\Http\Controllers\Api\v1\FolderController;
 use App\Http\Controllers\Api\v1\MediaController;
 use App\Http\Controllers\Api\TrendSsoController;
+use App\Http\Controllers\Api\AdminRequestController;
 use Illuminate\Support\Facades\Route;
 
 
@@ -96,6 +97,12 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('support/tickets/{id}', [SupportController::class, 'show']);
             Route::post('support/ticket', [SupportController::class, 'store']);
             Route::post('support/message', [SupportController::class, 'sendMessage']);
+            
+            // Admin requests
+            Route::get('admin-requests', [AdminRequestController::class, 'index']);
+            Route::get('admin-requests/{id}', [AdminRequestController::class, 'show']);
+            Route::post('admin-requests/{id}/approve', [AdminRequestController::class, 'approve']);
+            Route::post('admin-requests/{id}/reject', [AdminRequestController::class, 'reject']);
         });
     });
 });

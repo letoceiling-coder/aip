@@ -70,17 +70,38 @@ class IntegrationService
 
             if ($response->successful()) {
                 $data = $response->json();
-                $crmTicketId = $data['data']['id'] ?? null;
+                
+                // Логируем полный ответ для диагностики
+                Log::channel('tickets')->debug('CRM response received', [
+                    'ticket_id' => $ticket->id,
+                    'response_status' => $response->status(),
+                    'full_response' => $data,
+                    'response_structure' => [
+                        'has_data' => isset($data['data']),
+                        'data_type' => isset($data['data']) ? gettype($data['data']) : null,
+                        'has_id' => isset($data['data']['id']),
+                        'id_value' => $data['data']['id'] ?? null,
+                    ],
+                ]);
+                
+                // Пытаемся получить ID из разных возможных мест в ответе
+                $crmTicketId = $data['data']['id'] ?? $data['id'] ?? $data['ticket_id'] ?? null;
                 
                 if ($crmTicketId) {
                     $ticket->update(['external_id' => $crmTicketId]);
+                    
+                    Log::channel('tickets')->info('Ticket sent to CRM successfully and external_id saved', [
+                        'ticket_id' => $ticket->id,
+                        'crm_ticket_id' => $crmTicketId,
+                        'external_id_saved' => $ticket->fresh()->external_id === $crmTicketId,
+                    ]);
+                } else {
+                    Log::channel('tickets')->warning('Ticket sent to CRM but ID not found in response', [
+                        'ticket_id' => $ticket->id,
+                        'response_data' => $data,
+                        'response_keys' => array_keys($data),
+                    ]);
                 }
-
-                Log::channel('tickets')->info('Ticket sent to CRM successfully', [
-                    'ticket_id' => $ticket->id,
-                    'crm_ticket_id' => $crmTicketId,
-                    'response_data' => $data,
-                ]);
 
                 return $crmTicketId;
             }

@@ -369,6 +369,12 @@ export default {
     setup(props, { emit }) {
         const loading = ref(false)
         const saving = ref(false)
+        const activeTab = ref('main')
+        const tabs = [
+            { key: 'main', label: 'Основные' },
+            { key: 'messages', label: 'Сообщения' },
+            { key: 'advanced', label: 'Дополнительно' },
+        ]
         const form = ref({
             required_channel_id: null,
             required_channel_username: '',

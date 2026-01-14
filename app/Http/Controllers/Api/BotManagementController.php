@@ -172,6 +172,7 @@ class BotManagementController extends Controller
     public function getMaterialCategories(string $botId): JsonResponse
     {
         $categories = BotMaterialCategory::where('bot_id', $botId)
+            ->with(['media', 'allMaterials'])
             ->orderBy('order_index', 'asc')
             ->get();
 

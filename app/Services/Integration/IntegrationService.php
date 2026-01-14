@@ -57,6 +57,13 @@ class IntegrationService
                 'project' => $this->projectIdentifier,
             ];
 
+            Log::channel('tickets')->debug('Sending ticket to CRM', [
+                'url' => $url,
+                'token_length' => strlen($this->deployToken),
+                'token_preview' => substr($this->deployToken, 0, 3) . '...' . substr($this->deployToken, -3),
+                'payload' => $payload,
+            ]);
+
             $response = Http::withToken($this->deployToken)
                 ->timeout(30)
                 ->post($url, $payload);
@@ -69,18 +76,25 @@ class IntegrationService
                     $ticket->update(['external_id' => $crmTicketId]);
                 }
 
-                Log::channel('tickets')->info('Ticket sent to CRM', [
+                Log::channel('tickets')->info('Ticket sent to CRM successfully', [
                     'ticket_id' => $ticket->id,
                     'crm_ticket_id' => $crmTicketId,
+                    'response_data' => $data,
                 ]);
 
                 return $crmTicketId;
             }
 
+            $responseBody = $response->body();
+            $responseJson = $response->json();
+            
             Log::channel('tickets')->error('Failed to send ticket to CRM', [
                 'ticket_id' => $ticket->id,
                 'status' => $response->status(),
-                'response' => $response->body(),
+                'response_body' => $responseBody,
+                'response_json' => $responseJson,
+                'url' => $url,
+                'token_length' => strlen($this->deployToken),
             ]);
 
             return null;

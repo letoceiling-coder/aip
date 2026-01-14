@@ -74,3 +74,4 @@ git push origin main
 
 См. [AUTO_DEPLOY_SETUP.md](AUTO_DEPLOY_SETUP.md) для всех вариантов настройки.
 
+

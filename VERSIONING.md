@@ -201,6 +201,48 @@ git push origin --delete v1.0.0
 
 Все версии проекта с описанием изменений. Версии отсортированы от новых к старым.
 
+### v1.2.0 (2025-12-27) - Создание бота Аудиторско-консалтинговая группа «АИП»
+
+**Статус:** ✅ Стабильная  
+**Дата релиза:** 27 декабря 2025
+
+**Основные изменения:**
+- ✅ Создан полнофункциональный бот для Аудиторско-консалтинговой группы «АИП»
+- ✅ Реализована система проверки подписки на обязательный Telegram-канал
+- ✅ Добавлено управление заявками на консультации через админ-панель
+- ✅ Реализованы категории материалов с поддержкой внешних ссылок (Mini App)
+- ✅ Добавлено управление материалами (загрузка, медиа-библиотека, URL, Telegram file_id)
+- ✅ Полная настройка всех текстов сообщений бота через админ-панель
+- ✅ Уведомления администраторам о новых заявках в Telegram
+- ✅ Статистика работы бота (пользователи, заявки, скачивания материалов)
+- ✅ Реализована FSM (Finite State Machine) для управления состояниями пользователей
+- ✅ Динамическая валидация полей формы на основе настроек бота
+- ✅ Просмотр логов системы в админ-панели
+- ✅ Обновлена документация по управлению ботом
+- ✅ Создан seeder для категорий материалов бота
+
+**Миграции БД:**
+- Созданы таблицы: `bot_users`, `bot_subscriptions`, `bot_material_categories`, `bot_materials`, `bot_consultations`, `bot_logs`
+- Добавлены поля в таблицу `bots`: `required_channel_id`, `required_channel_username`, `admin_telegram_ids`, `yandex_maps_url`, обновлено поле `settings`
+- Добавлено поле `external_url` в таблицу `bot_material_categories`
+
+**Новые компоненты:**
+- Vue компоненты: `BotManagement.vue`, `ConsultationTable.vue`, `ConsultationDetail.vue`, `MaterialCategoryTree.vue`, `MaterialForm.vue`, `BotSettingsForm.vue`, `BotStatistics.vue`, `Logs.vue`
+- Backend сервисы: `BotHandlerService`, `BotSubscriptionService`, `BotMenuService`, `BotFormService`, `BotMaterialService`, `BotLoggerService`, `BotNotificationService`
+- Контроллер: `BotManagementController`
+- Seeder: `BotMaterialCategorySeeder`
+
+**Документация:**
+- Добавлено руководство `BOT_MANAGEMENT_GUIDE.md`
+- Обновлена документация в админ-панели (`/admin/documentation`)
+
+**Установка:**
+```bash
+git clone --branch v1.2.0 --depth 1 https://github.com/letoceiling-coder/aip.git
+```
+
+---
+
 ### v1.1.0 (2025-12-26) - Актуальная реализация добавление ботов настройка webhook
 
 **Статус:** Стабильная версия

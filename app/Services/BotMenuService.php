@@ -51,17 +51,13 @@ class BotMenuService
 
         $keyboard = [];
         foreach ($categories as $category) {
-            if ($category->external_url) {
-                // Если есть external_url, используем web_app для открытия в Mini App
-                $keyboard[] = [
-                    ['text' => $category->name, 'web_app' => ['url' => $category->external_url]],
-                ];
-            } else {
-                // Если нет external_url, используем callback_data (старая логика)
-                $keyboard[] = [
-                    ['text' => $category->name, 'callback_data' => BotActions::MATERIAL_CATEGORY . $category->id],
-                ];
-            }
+            // Формируем текст кнопки с иконкой (если есть)
+            $buttonText = ($category->icon ? $category->icon . ' ' : '') . $category->name;
+            
+            // Всегда используем callback_data для отправки файла
+            $keyboard[] = [
+                ['text' => $buttonText, 'callback_data' => BotActions::MATERIAL_CATEGORY . $category->id],
+            ];
         }
 
         $keyboard[] = [

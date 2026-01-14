@@ -11,8 +11,10 @@ class BotMaterialCategory extends Model
     protected $fillable = [
         'bot_id',
         'name',
+        'icon',
         'description',
         'external_url',
+        'media_id',
         'order_index',
         'is_active',
     ];
@@ -52,4 +54,11 @@ class BotMaterialCategory extends Model
             ->orderBy('order_index', 'asc')
             ->orderBy('id', 'asc');
     }
-}
+
+    /**
+     * Файл из медиа-библиотеки
+     */
+    public function media(): BelongsTo
+    {
+        return $this->belongsTo(Media::class, 'media_id');
+    }

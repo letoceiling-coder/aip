@@ -189,7 +189,9 @@ class BotManagementController extends Controller
         $category = BotMaterialCategory::create([
             'bot_id' => $botId,
             'name' => $request->name,
+            'icon' => $request->icon,
             'description' => $request->description,
+            'media_id' => $request->media_id,
             'order_index' => $request->order_index ?? 0,
             'is_active' => $request->is_active ?? true,
         ]);
@@ -210,7 +212,9 @@ class BotManagementController extends Controller
 
         $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
+            'icon' => 'nullable|string|max:10',
             'description' => 'nullable|string',
+            'media_id' => 'nullable|exists:media,id',
             'order_index' => 'nullable|integer|min:0',
             'is_active' => 'nullable|boolean',
         ]);

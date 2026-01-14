@@ -110,3 +110,4 @@ MAIN_MENU → MATERIALS_LIST → MATERIAL_CATEGORY
 **Статус**: План готов к реализации  
 **Дата**: 2025-01-15
 
+

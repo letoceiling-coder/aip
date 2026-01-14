@@ -494,3 +494,4 @@ $description = strip_tags($description); // Удаление HTML тегов
 **Дата создания**: 2025-01-15  
 **Версия**: 1.0
 
+

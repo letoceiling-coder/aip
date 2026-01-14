@@ -27,9 +27,18 @@ class StoreMaterialCategoryRequest extends FormRequest
                 'string',
                 'max:255',
             ],
+            'icon' => [
+                'nullable',
+                'string',
+                'max:10',
+            ],
             'description' => [
                 'nullable',
                 'string',
+            ],
+            'media_id' => [
+                'nullable',
+                'exists:media,id',
             ],
             'order_index' => [
                 'nullable',

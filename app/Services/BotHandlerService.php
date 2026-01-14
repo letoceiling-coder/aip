@@ -307,12 +307,19 @@ class BotHandlerService
      */
     protected function showMaterialCategory(Bot $bot, BotUser $user, int $categoryId): void
     {
-        $category = \App\Models\BotMaterialCategory::find($categoryId);
+        $category = \App\Models\BotMaterialCategory::with('media')->find($categoryId);
         if (!$category || $category->bot_id != $bot->id) {
             $this->telegram->sendMessage($bot->token, $user->telegram_user_id, 'Категория не найдена');
             return;
         }
 
+        // Если у категории есть файл из медиа-библиотеки, отправляем его
+        if ($category->media_id && $category->media) {
+            $this->sendCategoryFile($bot, $user, $category);
+            return;
+        }
+
+        // Иначе показываем список материалов категории (старая логика)
         $text = $category->name;
         if ($category->description) {
             $text .= "\n\n" . $category->description;
@@ -328,6 +335,85 @@ class BotHandlerService
         );
 
         $user->update(['current_state' => BotStates::MATERIAL_CATEGORY]);
+    }
+
+    /**
+     * Отправить файл категории
+     */
+    protected function sendCategoryFile(Bot $bot, BotUser $user, \App\Models\BotMaterialCategory $category): void
+    {
+        $media = $category->media;
+        if (!$media) {
+            $this->telegram->sendMessage($bot->token, $user->telegram_user_id, 'Файл категории не найден');
+            return;
+        }
+
+        // Получаем путь к файлу
+        $filePath = $this->getMediaFilePath($media);
+        if (!$filePath || !file_exists($filePath)) {
+            $this->telegram->sendMessage($bot->token, $user->telegram_user_id, 'Файл не найден на сервере');
+            return;
+        }
+
+        // Формируем подпись
+        $caption = $category->name;
+        if ($category->description) {
+            $caption .= "\n\n" . $category->description;
+        }
+
+        // Отправляем файл
+        $result = $this->telegram->sendDocument(
+            $bot->token,
+            $user->telegram_user_id,
+            $filePath,
+            $caption
+        );
+
+        if (!$result['success']) {
+            $this->telegram->sendMessage(
+                $bot->token,
+                $user->telegram_user_id,
+                $result['message'] ?? 'Не удалось отправить файл'
+            );
+        }
+
+        // Возвращаем в главное меню
+        $this->showMainMenu($bot, $user);
+    }
+
+    /**
+     * Получить путь к файлу из медиа-библиотеки
+     */
+    protected function getMediaFilePath(\App\Models\Media $media): ?string
+    {
+        // Используем атрибут fullPath из модели Media
+        $fullPath = $media->fullPath;
+        
+        if ($fullPath && file_exists($fullPath)) {
+            return $fullPath;
+        }
+
+        // Альтернативный способ - через storage
+        $metadata = is_string($media->metadata) 
+            ? json_decode($media->metadata, true) 
+            : $media->metadata;
+        
+        if (isset($metadata['path'])) {
+            $storagePath = storage_path('app/public/' . ltrim($metadata['path'], '/'));
+            if (file_exists($storagePath)) {
+                return $storagePath;
+            }
+        }
+
+        // Пытаемся через disk и name
+        if ($media->disk && $media->name) {
+            $storagePath = storage_path('app/public/' . ltrim($media->disk . '/' . $media->name, '/'));
+            if (file_exists($storagePath)) {
+                return $storagePath;
+            }
+        }
+
+        return null;
     }
 
     /**

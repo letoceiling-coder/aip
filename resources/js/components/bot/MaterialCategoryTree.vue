@@ -24,9 +24,14 @@
             >
                 <div class="flex items-center justify-between mb-4">
                     <div>
-                        <h3 class="text-lg font-semibold">{{ category.name }}</h3>
+                        <h3 class="text-lg font-semibold">
+                            <span v-if="category.icon">{{ category.icon }} </span>{{ category.name }}
+                        </h3>
                         <p v-if="category.description" class="text-sm text-muted-foreground mt-1">
                             {{ category.description }}
+                        </p>
+                        <p v-if="category.media" class="text-xs text-muted-foreground mt-1">
+                            📎 Файл: {{ category.media.name }}
                         </p>
                     </div>
                     <div class="flex gap-2">
@@ -35,6 +40,12 @@
                             class="px-3 py-1 text-xs bg-yellow-500 hover:bg-yellow-600 text-white rounded"
                         >
                             Редактировать
+                        </button>
+                        <button
+                            @click="selectCategoryFile(category)"
+                            class="px-3 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded"
+                        >
+                            📎 Файл
                         </button>
                         <button
                             @click="deleteCategory(category)"
@@ -167,6 +178,7 @@ export default {
             const { value: formValues } = await Swal.fire({
                 title: 'Создать категорию',
                 html: `
+                    <input id="swal-icon" class="swal2-input" placeholder="Иконка (эмодзи, например: 🧩)" maxlength="10">
                     <input id="swal-name" class="swal2-input" placeholder="Название" required>
                     <textarea id="swal-description" class="swal2-textarea" placeholder="Описание"></textarea>
                     <input id="swal-order" class="swal2-input" type="number" placeholder="Порядок" value="0">
@@ -183,6 +195,7 @@ export default {
                     }
                     return {
                         name: name,
+                        icon: document.getElementById('swal-icon').value || null,
                         description: document.getElementById('swal-description').value,
                         order_index: parseInt(document.getElementById('swal-order').value) || 0,
                     }
@@ -309,6 +322,7 @@ export default {
             const { value: formValues } = await Swal.fire({
                 title: 'Редактировать категорию',
                 html: `
+                    <input id="swal-icon" class="swal2-input" placeholder="Иконка (эмодзи, например: 🧩)" value="${category.icon || ''}" maxlength="10">
                     <input id="swal-name" class="swal2-input" placeholder="Название" value="${category.name}">
                     <textarea id="swal-description" class="swal2-textarea" placeholder="Описание">${category.description || ''}</textarea>
                     <input id="swal-order" class="swal2-input" type="number" placeholder="Порядок" value="${category.order_index}">
@@ -320,6 +334,7 @@ export default {
                 preConfirm: () => {
                     return {
                         name: document.getElementById('swal-name').value,
+                        icon: document.getElementById('swal-icon').value || null,
                         description: document.getElementById('swal-description').value,
                         order_index: parseInt(document.getElementById('swal-order').value) || 0,
                     }
@@ -364,6 +379,70 @@ export default {
             showMaterialForm.value = true
         }
 
+        const selectCategoryFile = async (category) => {
+            // Загружаем список файлов из медиа-библиотеки
+            try {
+                const response = await apiGet('/media', { per_page: 100 })
+                if (!response.ok) {
+                    throw new Error('Ошибка загрузки медиа-файлов')
+                }
+
+                const data = await response.json()
+                const mediaFiles = data.data || []
+
+                // Показываем список файлов для выбора
+                const { value: selectedMediaId } = await Swal.fire({
+                    title: 'Выберите файл',
+                    html: `
+                        <select id="swal-media" class="swal2-select" style="width: 100%; padding: 8px; margin-top: 10px;">
+                            <option value="">-- Без файла --</option>
+                            ${mediaFiles.map(media => 
+                                `<option value="${media.id}" ${category.media_id === media.id ? 'selected' : ''}>${media.name} (${(media.size / 1024).toFixed(2)} KB)</option>`
+                            ).join('')}
+                        </select>
+                    `,
+                    focusConfirm: false,
+                    showCancelButton: true,
+                    confirmButtonText: 'Сохранить',
+                    cancelButtonText: 'Отмена',
+                    preConfirm: () => {
+                        const select = document.getElementById('swal-media')
+                        return select ? select.value : null
+                    },
+                })
+
+                if (selectedMediaId !== undefined) {
+                    const mediaId = selectedMediaId ? parseInt(selectedMediaId) : null
+                    
+                    // Обновляем категорию
+                    const response = await apiPut(`/bot-management/${props.botId}/materials/categories/${category.id}`, {
+                        media_id: mediaId,
+                    })
+
+                    if (!response.ok) {
+                        throw new Error('Ошибка обновления категории')
+                    }
+
+                    await Swal.fire({
+                        title: 'Сохранено',
+                        icon: 'success',
+                        timer: 2000,
+                        showConfirmButton: false,
+                        toast: true,
+                        position: 'top-end',
+                    })
+
+                    fetchCategories()
+                }
+            } catch (err) {
+                Swal.fire({
+                    title: 'Ошибка',
+                    text: err.message || 'Ошибка выбора файла',
+                    icon: 'error',
+                })
+            }
+        }
+
         onMounted(() => {
             fetchCategories()
         })
@@ -382,6 +461,7 @@ export default {
             editCategory,
             editMaterial,
             showMaterialModal,
+            selectCategoryFile,
         }
     },
 }

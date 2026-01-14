@@ -62,3 +62,4 @@ class BotMaterialCategory extends Model
     {
         return $this->belongsTo(Media::class, 'media_id');
     }
+}

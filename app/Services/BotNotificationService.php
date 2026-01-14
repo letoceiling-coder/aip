@@ -81,15 +81,20 @@ class BotNotificationService
         
         // Для каждого администратора ищем его BotUser записи
         foreach ($adminUsers as $adminUser) {
-            // Ищем BotUser по email (если email совпадает с username в BotUser)
-            // Или ищем по другим признакам
-            // Пока используем только admin_telegram_ids из ботов
+            // Ищем BotUser по username (если username администратора совпадает с username в BotUser)
+            // Или по email (если email администратора совпадает с username в BotUser)
+            $emailUsername = str_replace('@', '', $adminUser->email ?? '');
             
-            // Если в будущем добавим связь User -> BotUser, можно будет использовать:
-            // $botUsers = BotUser::where('email', $adminUser->email)->get();
-            // foreach ($botUsers as $botUser) {
-            //     $adminIds[] = $botUser->telegram_user_id;
-            // }
+            $botUsers = \App\Models\BotUser::where(function ($query) use ($adminUser, $emailUsername) {
+                if ($adminUser->email) {
+                    $query->where('username', $emailUsername)
+                          ->orWhere('username', $adminUser->email);
+                }
+            })->get();
+            
+            foreach ($botUsers as $botUser) {
+                $adminIds[] = $botUser->telegram_user_id;
+            }
         }
         
         // Убираем дубликаты и пустые значения

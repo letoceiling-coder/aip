@@ -17,6 +17,7 @@ class BotNotificationService
 
     /**
      * Уведомить администраторов о новой заявке
+     * ОБЯЗАТЕЛЬНО отправляет уведомления всем администраторам
      */
     public function notifyNewConsultation(Bot $bot, BotConsultation $consultation): void
     {
@@ -24,83 +25,202 @@ class BotNotificationService
         $adminIds = $this->getAllAdminTelegramIds($bot);
         
         if (empty($adminIds)) {
-            Log::warning("No admin Telegram IDs found for consultation notification", [
+            // КРИТИЧЕСКАЯ ОШИБКА: нет администраторов для уведомления
+            Log::error("❌ CRITICAL: No admin Telegram IDs found for consultation notification", [
                 'bot_id' => $bot->id,
+                'bot_name' => $bot->name,
                 'consultation_id' => $consultation->id,
+                'consultation_name' => $consultation->name,
+                'consultation_phone' => $consultation->phone,
             ]);
+            
+            // Все равно обновляем флаг, но с пометкой об ошибке
+            $consultation->update([
+                'telegram_notified' => false,
+                'telegram_notified_at' => null,
+            ]);
+            
             return;
         }
 
         $message = $this->formatConsultationMessage($bot, $consultation);
         
+        $successCount = 0;
+        $failCount = 0;
+        
+        Log::info('📤 Sending consultation notifications to admins', [
+            'bot_id' => $bot->id,
+            'consultation_id' => $consultation->id,
+            'admin_count' => count($adminIds),
+            'admin_ids' => $adminIds,
+        ]);
+        
         foreach ($adminIds as $adminId) {
             try {
-                $this->telegram->sendMessage(
+                $result = $this->telegram->sendMessage(
                     $bot->token,
                     $adminId,
                     $message,
                     ['parse_mode' => 'HTML']
                 );
+                
+                if ($result['success'] ?? false) {
+                    $successCount++;
+                    Log::info("✅ Notification sent to admin", [
+                        'bot_id' => $bot->id,
+                        'consultation_id' => $consultation->id,
+                        'admin_id' => $adminId,
+                    ]);
+                } else {
+                    $failCount++;
+                    Log::error("❌ Failed to send notification to admin", [
+                        'bot_id' => $bot->id,
+                        'consultation_id' => $consultation->id,
+                        'admin_id' => $adminId,
+                        'error' => $result['message'] ?? 'Unknown error',
+                    ]);
+                }
             } catch (\Exception $e) {
-                Log::error("Failed to send notification to admin {$adminId}: " . $e->getMessage(), [
+                $failCount++;
+                Log::error("❌ Exception sending notification to admin {$adminId}: " . $e->getMessage(), [
                     'bot_id' => $bot->id,
                     'consultation_id' => $consultation->id,
+                    'admin_id' => $adminId,
+                    'exception' => $e->getTraceAsString(),
                 ]);
             }
         }
         
-        // Обновляем флаг уведомления
-        $consultation->update([
-            'telegram_notified' => true,
-            'telegram_notified_at' => now(),
-        ]);
+        // Обновляем флаг уведомления только если хотя бы одно уведомление отправлено успешно
+        if ($successCount > 0) {
+            $consultation->update([
+                'telegram_notified' => true,
+                'telegram_notified_at' => now(),
+            ]);
+            
+            Log::info('✅ Consultation notifications completed', [
+                'bot_id' => $bot->id,
+                'consultation_id' => $consultation->id,
+                'success_count' => $successCount,
+                'fail_count' => $failCount,
+                'total_admins' => count($adminIds),
+            ]);
+        } else {
+            Log::error('❌ CRITICAL: Failed to send consultation notifications to all admins', [
+                'bot_id' => $bot->id,
+                'consultation_id' => $consultation->id,
+                'fail_count' => $failCount,
+                'total_admins' => count($adminIds),
+            ]);
+        }
     }
 
     /**
      * Получить все Telegram ID администраторов
      * Собирает ID из всех ботов и пользователей с ролью admin
+     * ОБЯЗАТЕЛЬНО находит всех администраторов
      */
     protected function getAllAdminTelegramIds(Bot $bot): array
     {
         $adminIds = [];
         
-        // 1. Получаем admin_telegram_ids из всех ботов
+        // 1. Получаем admin_telegram_ids из всех активных ботов
         $bots = \App\Models\Bot::where('is_active', true)->get();
         foreach ($bots as $botItem) {
             $botAdminIds = $botItem->admin_telegram_ids ?? [];
-            if (is_array($botAdminIds)) {
+            if (is_array($botAdminIds) && !empty($botAdminIds)) {
                 $adminIds = array_merge($adminIds, $botAdminIds);
+                Log::info('📋 Found admin IDs from bot settings', [
+                    'bot_id' => $botItem->id,
+                    'bot_name' => $botItem->name,
+                    'admin_ids' => $botAdminIds,
+                ]);
             }
         }
         
         // 2. Получаем Telegram ID из пользователей с ролью admin через BotUser
-        // Находим всех пользователей с ролью admin
+        // Находим ВСЕХ пользователей с ролью admin
         $adminUsers = \App\Models\User::whereHas('roles', function ($query) {
             $query->where('slug', 'admin');
         })->get();
         
+        Log::info('👥 Found admin users in system', [
+            'admin_count' => $adminUsers->count(),
+            'admin_emails' => $adminUsers->pluck('email')->toArray(),
+        ]);
+        
         // Для каждого администратора ищем его BotUser записи
         foreach ($adminUsers as $adminUser) {
-            // Ищем BotUser по username (если username администратора совпадает с username в BotUser)
-            // Или по email (если email администратора совпадает с username в BotUser)
-            $emailUsername = str_replace('@', '', $adminUser->email ?? '');
+            $foundTelegramIds = [];
             
-            $botUsers = \App\Models\BotUser::where(function ($query) use ($adminUser, $emailUsername) {
-                if ($adminUser->email) {
+            // Способ 1: Ищем BotUser по email (email администратора может совпадать с username в BotUser)
+            if ($adminUser->email) {
+                $emailUsername = str_replace('@', '', $adminUser->email);
+                
+                $botUsers = \App\Models\BotUser::where(function ($query) use ($adminUser, $emailUsername) {
                     $query->where('username', $emailUsername)
-                          ->orWhere('username', $adminUser->email);
+                          ->orWhere('username', $adminUser->email)
+                          ->orWhere('username', 'like', '%' . $emailUsername . '%');
+                })->get();
+                
+                foreach ($botUsers as $botUser) {
+                    if ($botUser->telegram_user_id) {
+                        $foundTelegramIds[] = $botUser->telegram_user_id;
+                    }
                 }
-            })->get();
+            }
             
-            foreach ($botUsers as $botUser) {
-                $adminIds[] = $botUser->telegram_user_id;
+            // Способ 2: Ищем BotUser по имени (если имя администратора совпадает с именем в BotUser)
+            if ($adminUser->name) {
+                $botUsersByName = \App\Models\BotUser::where(function ($query) use ($adminUser) {
+                    $query->where('first_name', 'like', '%' . $adminUser->name . '%')
+                          ->orWhere('last_name', 'like', '%' . $adminUser->name . '%');
+                })->get();
+                
+                foreach ($botUsersByName as $botUser) {
+                    if ($botUser->telegram_user_id && !in_array($botUser->telegram_user_id, $foundTelegramIds)) {
+                        $foundTelegramIds[] = $botUser->telegram_user_id;
+                    }
+                }
+            }
+            
+            // Способ 3: Если email администратора в формате telegram_{id}@telegram.local, извлекаем ID
+            if ($adminUser->email && preg_match('/telegram_(\d+)@telegram\.local/', $adminUser->email, $matches)) {
+                $telegramId = (int) $matches[1];
+                if ($telegramId && !in_array($telegramId, $foundTelegramIds)) {
+                    $foundTelegramIds[] = $telegramId;
+                }
+            }
+            
+            if (!empty($foundTelegramIds)) {
+                $adminIds = array_merge($adminIds, $foundTelegramIds);
+                Log::info('✅ Found Telegram IDs for admin user', [
+                    'admin_email' => $adminUser->email,
+                    'admin_name' => $adminUser->name,
+                    'telegram_ids' => $foundTelegramIds,
+                ]);
+            } else {
+                Log::warning('⚠️ Admin user has no associated Telegram ID', [
+                    'admin_email' => $adminUser->email,
+                    'admin_name' => $adminUser->name,
+                    'admin_id' => $adminUser->id,
+                ]);
             }
         }
         
-        // Убираем дубликаты и пустые значения
-        $adminIds = array_unique(array_filter($adminIds));
+        // Убираем дубликаты и пустые значения, оставляем только числовые ID
+        $adminIds = array_filter($adminIds, function($id) {
+            return is_numeric($id) && $id > 0;
+        });
+        $adminIds = array_unique($adminIds);
+        $adminIds = array_values($adminIds);
         
-        return array_values($adminIds);
+        Log::info('📊 Total admin Telegram IDs collected', [
+            'total_count' => count($adminIds),
+            'admin_ids' => $adminIds,
+        ]);
+        
+        return $adminIds;
     }
 
     /**

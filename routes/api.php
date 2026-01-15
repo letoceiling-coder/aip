@@ -84,6 +84,10 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::post('materials', [\App\Http\Controllers\Api\BotManagementController::class, 'storeMaterial']);
                 Route::put('materials/{id}', [\App\Http\Controllers\Api\BotManagementController::class, 'updateMaterial']);
                 Route::delete('materials/{id}', [\App\Http\Controllers\Api\BotManagementController::class, 'destroyMaterial']);
+                Route::post('materials/update-positions', [\App\Http\Controllers\Api\BotManagementController::class, 'updateMaterialPositions']);
+                
+                // Позиции категорий
+                Route::post('materials/categories/update-positions', [\App\Http\Controllers\Api\BotManagementController::class, 'updateCategoryPositions']);
                 
                 // Статистика
                 Route::get('statistics', [\App\Http\Controllers\Api\BotManagementController::class, 'getStatistics']);

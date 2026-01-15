@@ -374,6 +374,55 @@ class BotManagementController extends Controller
     }
 
     /**
+     * Обновить позиции материалов
+     */
+    public function updateMaterialPositions(Request $request, string $botId): JsonResponse
+    {
+        $request->validate([
+            'materials' => 'required|array',
+            'materials.*.id' => 'required|integer|exists:bot_materials,id',
+            'materials.*.order_index' => 'required|integer|min:0',
+        ]);
+
+        foreach ($request->materials as $materialData) {
+            $material = BotMaterial::whereHas('category', function ($q) use ($botId) {
+                $q->where('bot_id', $botId);
+            })->findOrFail($materialData['id']);
+
+            $material->update(['order_index' => $materialData['order_index']]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Позиции материалов обновлены',
+        ]);
+    }
+
+    /**
+     * Обновить позиции категорий
+     */
+    public function updateCategoryPositions(Request $request, string $botId): JsonResponse
+    {
+        $request->validate([
+            'categories' => 'required|array',
+            'categories.*.id' => 'required|integer|exists:bot_material_categories,id',
+            'categories.*.order_index' => 'required|integer|min:0',
+        ]);
+
+        foreach ($request->categories as $categoryData) {
+            $category = BotMaterialCategory::where('bot_id', $botId)
+                ->findOrFail($categoryData['id']);
+
+            $category->update(['order_index' => $categoryData['order_index']]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Позиции категорий обновлены',
+        ]);
+    }
+
+    /**
      * Получить статистику бота
      */
     public function getStatistics(string $botId): JsonResponse

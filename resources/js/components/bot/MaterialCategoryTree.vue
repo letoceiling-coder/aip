@@ -3,7 +3,7 @@
         <div class="flex items-center justify-between">
             <h2 class="text-2xl font-semibold">Материалы</h2>
             <button
-                @click="showCategoryModal = true"
+                @click="createCategory"
                 class="h-11 px-6 bg-accent/10 backdrop-blur-xl text-accent border border-accent/40 hover:bg-accent/20 rounded-2xl"
             >
                 + Добавить категорию
@@ -16,11 +16,19 @@
         </div>
 
         <!-- Categories List -->
-        <div v-if="!loading" class="space-y-4">
+        <div v-if="!loading" class="space-y-4" ref="categoriesContainer">
             <div
-                v-for="category in categories"
+                v-for="(category, categoryIndex) in categories"
                 :key="category.id"
-                class="bg-card rounded-lg border border-border p-4"
+                :draggable="true"
+                @dragstart="handleCategoryDragStart($event, categoryIndex)"
+                @dragover.prevent="handleCategoryDragOver($event, categoryIndex)"
+                @drop="handleCategoryDrop($event, categoryIndex)"
+                @dragend="handleCategoryDragEnd"
+                :class="[
+                    'bg-card rounded-lg border border-border p-4 cursor-move transition-all',
+                    draggedCategoryIndex === categoryIndex ? 'opacity-50 border-accent' : ''
+                ]"
             >
                 <div class="flex items-center justify-between mb-4">
                     <div>
@@ -67,9 +75,17 @@
                 <!-- Materials List -->
                 <div v-if="category.materials && category.materials.length > 0" class="space-y-2">
                     <div
-                        v-for="material in category.materials"
+                        v-for="(material, materialIndex) in category.materials"
                         :key="material.id"
-                        class="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
+                        :draggable="true"
+                        @dragstart="handleMaterialDragStart($event, categoryIndex, materialIndex)"
+                        @dragover.prevent="handleMaterialDragOver($event, categoryIndex, materialIndex)"
+                        @drop="handleMaterialDrop($event, categoryIndex, materialIndex)"
+                        @dragend="handleMaterialDragEnd"
+                        :class="[
+                            'flex items-center justify-between p-3 bg-muted/30 rounded-lg cursor-move transition-all',
+                            draggedMaterialIndex === materialIndex && draggedCategoryIndex === categoryIndex ? 'opacity-50 border-2 border-accent' : ''
+                        ]"
                     >
                         <div>
                             <p class="font-medium">{{ material.title }}</p>
@@ -122,26 +138,14 @@
             @saved="handleMaterialSaved"
         />
 
-        <!-- Create Category Modal -->
-        <div v-if="showCategoryModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div class="bg-background border border-border rounded-lg shadow-2xl w-full max-w-md">
-                <div class="p-6">
-                    <h3 class="text-lg font-semibold mb-4">Создать категорию</h3>
-                    <button
-                        @click="createCategory"
-                        class="w-full h-10 px-4 bg-accent/10 backdrop-blur-xl text-accent border border-accent/40 hover:bg-accent/20 rounded-lg"
-                    >
-                        Открыть форму создания
-                    </button>
-                    <button
-                        @click="showCategoryModal = false"
-                        class="w-full mt-2 h-10 px-4 border border-border bg-background/50 hover:bg-accent/10 rounded-lg"
-                    >
-                        Отмена
-                    </button>
-                </div>
-            </div>
-        </div>
+        <!-- Category Form Modal -->
+        <CategoryForm
+            v-if="showCategoryForm"
+            :bot-id="botId"
+            :category="selectedCategoryForEdit"
+            @close="handleCategoryFormClose"
+            @saved="handleCategorySaved"
+        />
 
         <!-- Media Picker Modal -->
         <div v-if="showMediaPicker" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4">
@@ -168,16 +172,18 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { apiGet, apiDelete, apiPut, apiPost } from '../../utils/api'
 import Swal from 'sweetalert2'
 import MaterialForm from './MaterialForm.vue'
+import CategoryForm from './CategoryForm.vue'
 import Media from '../../pages/admin/Media.vue'
 
 export default {
     name: 'MaterialCategoryTree',
     components: {
         MaterialForm,
+        CategoryForm,
         Media,
     },
     props: {
@@ -189,10 +195,17 @@ export default {
     setup(props) {
         const loading = ref(false)
         const categories = ref([])
-        const showCategoryModal = ref(false)
+        const showCategoryForm = ref(false)
         const showMaterialForm = ref(false)
         const selectedCategory = ref(null)
+        const selectedCategoryForEdit = ref(null)
         const selectedMaterial = ref(null)
+        
+        // Drag and drop state
+        const draggedCategoryIndex = ref(null)
+        const draggedMaterialIndex = ref(null)
+        const draggedMaterialCategoryIndex = ref(null)
+        const categoriesContainer = ref(null)
 
         const fetchCategories = async () => {
             loading.value = true
@@ -216,60 +229,9 @@ export default {
             }
         }
 
-        const createCategory = async () => {
-            const { value: formValues } = await Swal.fire({
-                title: 'Создать категорию',
-                html: `
-                    <input id="swal-icon" class="swal2-input" placeholder="Иконка (эмодзи, например: 🧩)" maxlength="10">
-                    <input id="swal-name" class="swal2-input" placeholder="Название" required>
-                    <textarea id="swal-description" class="swal2-textarea" placeholder="Описание"></textarea>
-                    <input id="swal-order" class="swal2-input" type="number" placeholder="Порядок" value="0">
-                `,
-                focusConfirm: false,
-                showCancelButton: true,
-                confirmButtonText: 'Создать',
-                cancelButtonText: 'Отмена',
-                preConfirm: () => {
-                    const name = document.getElementById('swal-name').value
-                    if (!name) {
-                        Swal.showValidationMessage('Название обязательно')
-                        return false
-                    }
-                    return {
-                        name: name,
-                        icon: document.getElementById('swal-icon').value || null,
-                        description: document.getElementById('swal-description').value,
-                        order_index: parseInt(document.getElementById('swal-order').value) || 0,
-                    }
-                },
-            })
-
-            if (formValues) {
-                try {
-                    const response = await apiPost(`/bot-management/${props.botId}/materials/categories`, formValues)
-                    if (!response.ok) {
-                        throw new Error('Ошибка создания категории')
-                    }
-
-                    await Swal.fire({
-                        title: 'Создано',
-                        icon: 'success',
-                        timer: 2000,
-                        showConfirmButton: false,
-                        toast: true,
-                        position: 'top-end',
-                    })
-
-                    fetchCategories()
-                    showCategoryModal.value = false
-                } catch (err) {
-                    Swal.fire({
-                        title: 'Ошибка',
-                        text: err.message || 'Ошибка создания категории',
-                        icon: 'error',
-                    })
-                }
-            }
+        const createCategory = () => {
+            selectedCategoryForEdit.value = null
+            showCategoryForm.value = true
         }
 
         const fetchMaterials = async (category) => {
@@ -360,54 +322,18 @@ export default {
             }
         }
 
-        const editCategory = async (category) => {
-            const { value: formValues } = await Swal.fire({
-                title: 'Редактировать категорию',
-                html: `
-                    <input id="swal-icon" class="swal2-input" placeholder="Иконка (эмодзи, например: 🧩)" value="${category.icon || ''}" maxlength="10">
-                    <input id="swal-name" class="swal2-input" placeholder="Название" value="${category.name}">
-                    <textarea id="swal-description" class="swal2-textarea" placeholder="Описание">${category.description || ''}</textarea>
-                    <input id="swal-order" class="swal2-input" type="number" placeholder="Порядок" value="${category.order_index}">
-                `,
-                focusConfirm: false,
-                showCancelButton: true,
-                confirmButtonText: 'Сохранить',
-                cancelButtonText: 'Отмена',
-                preConfirm: () => {
-                    return {
-                        name: document.getElementById('swal-name').value,
-                        icon: document.getElementById('swal-icon').value || null,
-                        description: document.getElementById('swal-description').value,
-                        order_index: parseInt(document.getElementById('swal-order').value) || 0,
-                    }
-                },
-            })
-
-            if (formValues) {
-                try {
-                    const response = await apiPut(`/bot-management/${props.botId}/materials/categories/${category.id}`, formValues)
-                    if (!response.ok) {
-                        throw new Error('Ошибка обновления категории')
-                    }
-
-                    await Swal.fire({
-                        title: 'Сохранено',
-                        icon: 'success',
-                        timer: 2000,
-                        showConfirmButton: false,
-                        toast: true,
-                        position: 'top-end',
-                    })
-
-                    fetchCategories()
-                } catch (err) {
-                    Swal.fire({
-                        title: 'Ошибка',
-                        text: err.message || 'Ошибка обновления категории',
-                        icon: 'error',
-                    })
-                }
-            }
+        const editCategory = (category) => {
+            selectedCategoryForEdit.value = category
+            showCategoryForm.value = true
+        }
+        
+        const handleCategoryFormClose = () => {
+            showCategoryForm.value = false
+            selectedCategoryForEdit.value = null
+        }
+        
+        const handleCategorySaved = () => {
+            fetchCategories()
         }
 
         const editMaterial = (material) => {
@@ -502,6 +428,141 @@ export default {
             fetchCategories()
         }
 
+        // Drag and drop для категорий
+        const handleCategoryDragStart = (event, index) => {
+            draggedCategoryIndex.value = index
+            event.dataTransfer.effectAllowed = 'move'
+            event.dataTransfer.setData('text/html', event.target.outerHTML)
+        }
+
+        const handleCategoryDragOver = (event, index) => {
+            event.preventDefault()
+            if (draggedCategoryIndex.value !== null && draggedCategoryIndex.value !== index) {
+                event.dataTransfer.dropEffect = 'move'
+            }
+        }
+
+        const handleCategoryDrop = async (event, targetIndex) => {
+            event.preventDefault()
+            if (draggedCategoryIndex.value === null || draggedCategoryIndex.value === targetIndex) {
+                return
+            }
+
+            const sourceIndex = draggedCategoryIndex.value
+            const newCategories = [...categories.value]
+            const [movedCategory] = newCategories.splice(sourceIndex, 1)
+            newCategories.splice(targetIndex, 0, movedCategory)
+
+            // Обновляем order_index для всех категорий
+            const updatedCategories = newCategories.map((cat, idx) => ({
+                id: cat.id,
+                order_index: idx,
+            }))
+
+            try {
+                const response = await apiPost(`/bot-management/${props.botId}/materials/categories/update-positions`, {
+                    categories: updatedCategories,
+                })
+
+                if (response.ok) {
+                    categories.value = newCategories
+                    await Swal.fire({
+                        title: 'Позиция обновлена',
+                        icon: 'success',
+                        timer: 1500,
+                        showConfirmButton: false,
+                        toast: true,
+                        position: 'top-end',
+                    })
+                }
+            } catch (err) {
+                console.error('Error updating category positions:', err)
+                Swal.fire({
+                    title: 'Ошибка',
+                    text: 'Не удалось обновить позицию категории',
+                    icon: 'error',
+                })
+                fetchCategories() // Восстанавливаем исходный порядок
+            }
+        }
+
+        const handleCategoryDragEnd = () => {
+            draggedCategoryIndex.value = null
+        }
+
+        // Drag and drop для материалов
+        const handleMaterialDragStart = (event, categoryIndex, materialIndex) => {
+            draggedMaterialIndex.value = materialIndex
+            draggedMaterialCategoryIndex.value = categoryIndex
+            event.dataTransfer.effectAllowed = 'move'
+            event.dataTransfer.setData('text/html', event.target.outerHTML)
+        }
+
+        const handleMaterialDragOver = (event, categoryIndex, materialIndex) => {
+            event.preventDefault()
+            if (
+                draggedMaterialIndex.value !== null &&
+                draggedMaterialCategoryIndex.value === categoryIndex &&
+                draggedMaterialIndex.value !== materialIndex
+            ) {
+                event.dataTransfer.dropEffect = 'move'
+            }
+        }
+
+        const handleMaterialDrop = async (event, targetCategoryIndex, targetMaterialIndex) => {
+            event.preventDefault()
+            if (
+                draggedMaterialIndex.value === null ||
+                draggedMaterialCategoryIndex.value !== targetCategoryIndex ||
+                draggedMaterialIndex.value === targetMaterialIndex
+            ) {
+                return
+            }
+
+            const sourceIndex = draggedMaterialIndex.value
+            const category = categories.value[targetCategoryIndex]
+            const newMaterials = [...category.materials]
+            const [movedMaterial] = newMaterials.splice(sourceIndex, 1)
+            newMaterials.splice(targetMaterialIndex, 0, movedMaterial)
+
+            // Обновляем order_index для всех материалов в категории
+            const updatedMaterials = newMaterials.map((mat, idx) => ({
+                id: mat.id,
+                order_index: idx,
+            }))
+
+            try {
+                const response = await apiPost(`/bot-management/${props.botId}/materials/update-positions`, {
+                    materials: updatedMaterials,
+                })
+
+                if (response.ok) {
+                    category.materials = newMaterials
+                    await Swal.fire({
+                        title: 'Позиция обновлена',
+                        icon: 'success',
+                        timer: 1500,
+                        showConfirmButton: false,
+                        toast: true,
+                        position: 'top-end',
+                    })
+                }
+            } catch (err) {
+                console.error('Error updating material positions:', err)
+                Swal.fire({
+                    title: 'Ошибка',
+                    text: 'Не удалось обновить позицию материала',
+                    icon: 'error',
+                })
+                fetchCategories() // Восстанавливаем исходный порядок
+            }
+        }
+
+        const handleMaterialDragEnd = () => {
+            draggedMaterialIndex.value = null
+            draggedMaterialCategoryIndex.value = null
+        }
+
         const formatFileSize = (bytes) => {
             if (!bytes) return '0 B'
             const k = 1024
@@ -517,10 +578,14 @@ export default {
         return {
             loading,
             categories,
-            showCategoryModal,
+            showCategoryForm,
             showMaterialForm,
             selectedCategory,
+            selectedCategoryForEdit,
             selectedMaterial,
+            draggedCategoryIndex,
+            draggedMaterialIndex,
+            categoriesContainer,
             fetchCategories,
             createCategory,
             deleteCategory,
@@ -535,6 +600,16 @@ export default {
             removeCategoryFile,
             handleMaterialFormClose,
             handleMaterialSaved,
+            handleCategoryFormClose,
+            handleCategorySaved,
+            handleCategoryDragStart,
+            handleCategoryDragOver,
+            handleCategoryDrop,
+            handleCategoryDragEnd,
+            handleMaterialDragStart,
+            handleMaterialDragOver,
+            handleMaterialDrop,
+            handleMaterialDragEnd,
         }
     },
 }

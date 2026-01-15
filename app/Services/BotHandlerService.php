@@ -137,10 +137,21 @@ class BotHandlerService
         $this->telegram->answerCallbackQuery($bot->token, $callbackQueryId);
 
         // Обработка callback_data
-        if (str_starts_with($data, BotActions::MENU_MATERIALS)) {
+        if ($data === BotActions::MENU_MATERIALS) {
+            Log::info('📂 Menu materials button clicked', [
+                'bot_id' => $bot->id,
+                'user_id' => $user->telegram_user_id,
+                'callback_data' => $data,
+            ]);
             $this->showMaterialsList($bot, $user);
-        } elseif (str_starts_with($data, BotActions::MENU_CONSULTATION)) {
-            $this->showConsultationDescription($bot, $user);
+        } elseif ($data === BotActions::MENU_CONSULTATION) {
+            Log::info('📞 Menu consultation button clicked', [
+                'bot_id' => $bot->id,
+                'user_id' => $user->telegram_user_id,
+                'callback_data' => $data,
+            ]);
+            // Сразу запускаем форму консультации, минуя описание
+            $this->startConsultationForm($bot, $user);
         } elseif (str_starts_with($data, BotActions::MATERIAL_CATEGORY)) {
             $categoryId = (int) str_replace(BotActions::MATERIAL_CATEGORY, '', $data);
             $this->showMaterialCategory($bot, $user, $categoryId);

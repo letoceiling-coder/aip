@@ -879,11 +879,26 @@ class BotHandlerService
         } else {
             $listDescription = $materials['list_description'] ?? 
                 'Мы подготовили материалы по ключевым направлениям нашей работы.';
-            // Проверяем, что значение является строкой, а не массивом
-            $text = is_array($listDescription) 
-                ? 'Мы подготовили материалы по ключевым направлениям нашей работы.'
-                : (string) $listDescription;
+            // Проверяем, что значение является строкой, а не массивом, и не пустое
+            if (is_array($listDescription) || empty(trim((string) $listDescription))) {
+                $text = 'Мы подготовили материалы по ключевым направлениям нашей работы.';
+            } else {
+                $text = trim((string) $listDescription);
+            }
         }
+        
+        // Дополнительная проверка на пустоту
+        if (empty($text)) {
+            $text = 'Мы подготовили материалы по ключевым направлениям нашей работы.';
+        }
+        
+        Log::info('📂 Showing materials list', [
+            'bot_id' => $bot->id,
+            'user_id' => $user->telegram_user_id,
+            'has_categories' => $hasCategories,
+            'categories_count' => count($keyboard),
+            'text_length' => strlen($text),
+        ]);
 
         $this->telegram->sendMessageWithKeyboard(
             $bot->token,

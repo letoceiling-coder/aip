@@ -271,13 +271,15 @@ class BotHandlerService
         $messages = $settings['messages'] ?? [];
         $subscription = $messages['subscription'] ?? [];
 
-        $text = $subscription['required_text'] ?? 
+        $requiredText = $subscription['required_text'] ?? 
             'Для доступа к бета-версии необходимо подписаться на наш официальный Telegram-канал.';
-        
         $subscribeButton = $subscription['subscribe_button'] ?? '🔔 Подписаться на Telegram';
         $checkButton = $subscription['check_button'] ?? '✅ Я подписался';
 
         // Проверяем, что значения являются строками, а не массивами
+        $text = is_array($requiredText) 
+            ? 'Для доступа к бета-версии необходимо подписаться на наш официальный Telegram-канал.'
+            : (string) $requiredText;
         $subscribeButton = is_array($subscribeButton) ? '🔔 Подписаться на Telegram' : (string) $subscribeButton;
         $checkButton = is_array($checkButton) ? '✅ Я подписался' : (string) $checkButton;
 
@@ -314,6 +316,11 @@ class BotHandlerService
     protected function showMainMenu(Bot $bot, BotUser $user): void
     {
         $welcomeMessage = $bot->welcome_message ?? $this->getDefaultWelcomeMessage();
+        
+        // Проверяем, что welcome_message является строкой, а не массивом
+        $welcomeMessage = is_array($welcomeMessage) 
+            ? $this->getDefaultWelcomeMessage()
+            : (string) $welcomeMessage;
 
         $keyboard = $this->menu->getMainMenuKeyboard($bot);
 
@@ -356,8 +363,12 @@ class BotHandlerService
         if (!$hasCategories) {
             $text = 'К сожалению, материалы пока не добавлены. Пожалуйста, попробуйте позже.';
         } else {
-            $text = $materials['list_description'] ?? 
+            $listDescription = $materials['list_description'] ?? 
                 'Мы подготовили материалы по ключевым направлениям нашей работы.';
+            // Проверяем, что значение является строкой, а не массивом
+            $text = is_array($listDescription) 
+                ? 'Мы подготовили материалы по ключевым направлениям нашей работы.'
+                : (string) $listDescription;
         }
 
         $this->telegram->sendMessageWithKeyboard(
@@ -388,9 +399,16 @@ class BotHandlerService
         }
 
         // Иначе показываем список материалов категории (старая логика)
-        $text = $category->name;
-        if ($category->description) {
-            $text .= "\n\n" . $category->description;
+        $categoryName = is_array($category->name) ? '' : (string) ($category->name ?? '');
+        $categoryDescription = is_array($category->description) ? '' : (string) ($category->description ?? '');
+        
+        $text = $categoryName;
+        if ($categoryDescription) {
+            $text .= "\n\n" . $categoryDescription;
+        }
+        
+        if (empty($text)) {
+            $text = 'Категория материалов';
         }
 
         $keyboard = $this->menu->getMaterialCategoryKeyboard($categoryId);
@@ -513,9 +531,15 @@ class BotHandlerService
         $messages = $settings['messages'] ?? [];
         $consultation = $messages['consultation'] ?? [];
 
-        $text = $consultation['description'] ?? 
+        $consultationDescription = $consultation['description'] ?? 
             "Если вашему бизнесу нужна профессиональная юридическая поддержка, АИП возьмёт на себя все правовые вопросы.\n\n" .
             "Обращаясь к нам, вы избавляетесь на развитии бизнеса, а не на юридических рисках.";
+        
+        // Проверяем, что значение является строкой, а не массивом
+        $text = is_array($consultationDescription)
+            ? "Если вашему бизнесу нужна профессиональная юридическая поддержка, АИП возьмёт на себя все правовые вопросы.\n\n" .
+              "Обращаясь к нам, вы избавляетесь на развитии бизнеса, а не на юридических рисках."
+            : (string) $consultationDescription;
 
         $keyboard = $this->menu->getConsultationKeyboard();
 

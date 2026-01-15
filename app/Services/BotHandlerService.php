@@ -332,10 +332,12 @@ class BotHandlerService
         
         $welcomeMessage = $bot->welcome_message ?? $this->getDefaultWelcomeMessage();
         
-        // Проверяем, что welcome_message является строкой, а не массивом
-        $welcomeMessage = is_array($welcomeMessage) 
-            ? $this->getDefaultWelcomeMessage()
-            : (string) $welcomeMessage;
+        // Проверяем, что welcome_message является строкой, а не массивом, и не пустое
+        if (is_array($welcomeMessage) || empty(trim((string) $welcomeMessage))) {
+            $welcomeMessage = $this->getDefaultWelcomeMessage();
+        } else {
+            $welcomeMessage = (string) $welcomeMessage;
+        }
 
         // Проверяем, нужно ли отправлять reply кнопки
         $replyButtons = $settings['reply_buttons'] ?? [];
@@ -1067,8 +1069,25 @@ class BotHandlerService
         $consultation = $messages['consultation'] ?? [];
 
         $formNameLabel = $consultation['form_name_label'] ?? 'Введите ваше имя:';
-        // Проверяем, что значение является строкой, а не массивом
-        $text = is_array($formNameLabel) ? 'Введите ваше имя:' : (string) $formNameLabel;
+        // Проверяем, что значение является строкой, а не массивом, и не пустое
+        if (is_array($formNameLabel) || empty(trim((string) $formNameLabel))) {
+            $text = 'Введите ваше имя:';
+        } else {
+            $text = trim((string) $formNameLabel);
+        }
+        
+        // Дополнительная проверка на пустоту
+        if (empty($text)) {
+            $text = 'Введите ваше имя:';
+        }
+        
+        Log::info('📝 Starting consultation form', [
+            'bot_id' => $bot->id,
+            'user_id' => $user->telegram_user_id,
+            'form_name_label' => $formNameLabel,
+            'text' => $text,
+            'text_length' => strlen($text),
+        ]);
 
         // Проверяем, есть ли reply кнопки, чтобы сохранить их во время заполнения формы
         $replyButtons = $settings['reply_buttons'] ?? [];
@@ -1139,8 +1158,12 @@ class BotHandlerService
         $consultation = $messages['consultation'] ?? [];
 
         $formPhoneLabel = $consultation['form_phone_label'] ?? 'Введите ваш телефон:';
-        // Проверяем, что значение является строкой, а не массивом
-        $text = is_array($formPhoneLabel) ? 'Введите ваш телефон:' : (string) $formPhoneLabel;
+        // Проверяем, что значение является строкой, а не массивом, и не пустое
+        if (is_array($formPhoneLabel) || empty(trim((string) $formPhoneLabel))) {
+            $text = 'Введите ваш телефон:';
+        } else {
+            $text = trim((string) $formPhoneLabel);
+        }
         $this->telegram->sendMessage($bot->token, $user->telegram_user_id, $text);
 
         $user->update(['current_state' => BotStates::CONSULTATION_FORM_PHONE]);
@@ -1168,11 +1191,18 @@ class BotHandlerService
         $skipButton = $consultation['skip_description_button'] ?? 'Пропустить';
         $formDescriptionLabel = $consultation['form_description_label'] ?? 'Краткое описание запроса (опционально, можете пропустить):';
         
-        // Проверяем, что значения являются строками, а не массивами
-        $skipButton = is_array($skipButton) ? 'Пропустить' : (string) $skipButton;
-        $text = is_array($formDescriptionLabel) 
-            ? 'Краткое описание запроса (опционально, можете пропустить):'
-            : (string) $formDescriptionLabel;
+        // Проверяем, что значения являются строками, а не массивами, и не пустые
+        if (is_array($skipButton) || empty(trim((string) $skipButton))) {
+            $skipButton = 'Пропустить';
+        } else {
+            $skipButton = trim((string) $skipButton);
+        }
+        
+        if (is_array($formDescriptionLabel) || empty(trim((string) $formDescriptionLabel))) {
+            $text = 'Краткое описание запроса (опционально, можете пропустить):';
+        } else {
+            $text = trim((string) $formDescriptionLabel);
+        }
 
         // Отправляем сообщение с inline кнопкой "Пропустить"
         // Reply клавиатура остается активной (Telegram сохраняет ее до явного удаления)

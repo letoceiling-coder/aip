@@ -369,12 +369,27 @@ class TelegramService
             ];
         }
         
+        // Проверяем, что текст не пустой ПЕРЕД формированием параметров
+        $text = trim($text);
+        if (empty($text)) {
+            Log::error('❌ Cannot send message with empty text', [
+                'chat_id' => $chatId,
+                'original_text' => $text,
+                'text_length' => strlen($text),
+            ]);
+            return [
+                'success' => false,
+                'message' => 'Текст сообщения не может быть пустым',
+            ];
+        }
+        
         $params = array_merge($options, [
             'reply_markup' => $replyMarkup ? json_encode($replyMarkup) : null,
         ]);
         
         Log::info('📤 Sending message with reply keyboard', [
             'chat_id' => $chatId,
+            'text_length' => strlen($text),
             'keyboard_rows' => count($cleanedKeyboard),
             'keyboard' => $cleanedKeyboard,
         ]);

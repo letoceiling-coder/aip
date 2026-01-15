@@ -285,10 +285,44 @@ class TelegramService
         array $keyboard = [],
         array $options = []
     ): array {
+        // Валидация и очистка клавиатуры
+        $cleanedKeyboard = [];
+        foreach ($keyboard as $row) {
+            $cleanedRow = [];
+            foreach ($row as $button) {
+                if (!isset($button['text']) || empty($button['text'])) {
+                    Log::warning('⚠️ Skipping button with empty or missing text', ['button' => $button]);
+                    continue;
+                }
+                
+                $cleanedButton = [
+                    'text' => (string) $button['text'],
+                ];
+                
+                if (isset($button['url'])) {
+                    $cleanedButton['url'] = (string) $button['url'];
+                } elseif (isset($button['callback_data'])) {
+                    $cleanedButton['callback_data'] = (string) $button['callback_data'];
+                }
+                
+                $cleanedRow[] = $cleanedButton;
+            }
+            
+            if (!empty($cleanedRow)) {
+                $cleanedKeyboard[] = $cleanedRow;
+            }
+        }
+        
         $params = array_merge($options, [
-            'reply_markup' => !empty($keyboard) ? json_encode([
-                'inline_keyboard' => $keyboard,
+            'reply_markup' => !empty($cleanedKeyboard) ? json_encode([
+                'inline_keyboard' => $cleanedKeyboard,
             ]) : null,
+        ]);
+        
+        Log::info('📤 Sending message with keyboard', [
+            'chat_id' => $chatId,
+            'keyboard_rows' => count($cleanedKeyboard),
+            'keyboard' => $cleanedKeyboard,
         ]);
         
         return $this->sendMessage($token, $chatId, $text, $params);

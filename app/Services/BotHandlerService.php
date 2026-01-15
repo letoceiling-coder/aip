@@ -289,9 +289,9 @@ class BotHandlerService
 
         $keyboard = [];
         if ($channelUrl) {
-            $keyboard[] = [['text' => $subscribeButton, 'url' => $channelUrl]];
+            $keyboard[] = [['text' => (string) $subscribeButton, 'url' => (string) $channelUrl]];
         }
-        $keyboard[] = [['text' => $checkButton, 'callback_data' => BotActions::CHECK_SUBSCRIPTION]];
+        $keyboard[] = [['text' => (string) $checkButton, 'callback_data' => BotActions::CHECK_SUBSCRIPTION]];
 
         $this->telegram->sendMessageWithKeyboard(
             $bot->token,

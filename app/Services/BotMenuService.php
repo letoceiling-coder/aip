@@ -23,16 +23,16 @@ class BotMenuService
 
         $keyboard = [
             [
-                ['text' => $materialsButton, 'callback_data' => BotActions::MENU_MATERIALS],
+                ['text' => (string) $materialsButton, 'callback_data' => BotActions::MENU_MATERIALS],
             ],
             [
-                ['text' => $consultationButton, 'callback_data' => BotActions::MENU_CONSULTATION],
+                ['text' => (string) $consultationButton, 'callback_data' => BotActions::MENU_CONSULTATION],
             ],
         ];
 
         if ($bot->yandex_maps_url) {
             $keyboard[] = [
-                ['text' => $reviewButton, 'url' => $bot->yandex_maps_url],
+                ['text' => (string) $reviewButton, 'url' => (string) $bot->yandex_maps_url],
             ];
         }
 
@@ -52,7 +52,9 @@ class BotMenuService
         $keyboard = [];
         foreach ($categories as $category) {
             // Формируем текст кнопки с иконкой (если есть)
-            $buttonText = ($category->icon ? $category->icon . ' ' : '') . $category->name;
+            $icon = $category->icon ? (string) $category->icon . ' ' : '';
+            $name = (string) ($category->name ?? '');
+            $buttonText = $icon . $name;
             
             // Всегда используем callback_data для отправки файла
             $keyboard[] = [
@@ -82,7 +84,7 @@ class BotMenuService
         
         foreach ($materials as $material) {
             $keyboard[] = [
-                ['text' => $material->title, 'callback_data' => BotActions::MATERIAL_DOWNLOAD . $material->id],
+                ['text' => (string) ($material->title ?? ''), 'callback_data' => BotActions::MATERIAL_DOWNLOAD . $material->id],
             ];
         }
 

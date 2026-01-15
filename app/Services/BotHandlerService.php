@@ -277,21 +277,28 @@ class BotHandlerService
         $subscribeButton = $subscription['subscribe_button'] ?? '🔔 Подписаться на Telegram';
         $checkButton = $subscription['check_button'] ?? '✅ Я подписался';
 
+        // Проверяем, что значения являются строками, а не массивами
+        $subscribeButton = is_array($subscribeButton) ? '🔔 Подписаться на Telegram' : (string) $subscribeButton;
+        $checkButton = is_array($checkButton) ? '✅ Я подписался' : (string) $checkButton;
+
         $channelId = $bot->required_channel_id;
         $channelUsername = $bot->required_channel_username;
         $channelUrl = null;
 
         if ($channelUsername) {
-            $channelUrl = 'https://t.me/' . ltrim($channelUsername, '@');
+            $channelUsername = is_array($channelUsername) ? null : (string) $channelUsername;
+            if ($channelUsername) {
+                $channelUrl = 'https://t.me/' . ltrim($channelUsername, '@');
+            }
         } elseif ($channelId) {
             // Для ID канала нельзя создать прямую ссылку, используем username если есть
         }
 
         $keyboard = [];
         if ($channelUrl) {
-            $keyboard[] = [['text' => (string) $subscribeButton, 'url' => (string) $channelUrl]];
+            $keyboard[] = [['text' => $subscribeButton, 'url' => $channelUrl]];
         }
-        $keyboard[] = [['text' => (string) $checkButton, 'callback_data' => BotActions::CHECK_SUBSCRIPTION]];
+        $keyboard[] = [['text' => $checkButton, 'callback_data' => BotActions::CHECK_SUBSCRIPTION]];
 
         $this->telegram->sendMessageWithKeyboard(
             $bot->token,

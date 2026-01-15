@@ -21,19 +21,27 @@ class BotMenuService
         $consultationButton = $menu['consultation_button'] ?? '📞 Записаться на консультацию';
         $reviewButton = $menu['review_button'] ?? 'Оставь отзыв на Яндекс Картах';
 
+        // Проверяем, что значения являются строками, а не массивами
+        $materialsButton = is_array($materialsButton) ? '📂 Полезные материалы и договоры' : (string) $materialsButton;
+        $consultationButton = is_array($consultationButton) ? '📞 Записаться на консультацию' : (string) $consultationButton;
+        $reviewButton = is_array($reviewButton) ? 'Оставь отзыв на Яндекс Картах' : (string) $reviewButton;
+
         $keyboard = [
             [
-                ['text' => (string) $materialsButton, 'callback_data' => BotActions::MENU_MATERIALS],
+                ['text' => $materialsButton, 'callback_data' => BotActions::MENU_MATERIALS],
             ],
             [
-                ['text' => (string) $consultationButton, 'callback_data' => BotActions::MENU_CONSULTATION],
+                ['text' => $consultationButton, 'callback_data' => BotActions::MENU_CONSULTATION],
             ],
         ];
 
         if ($bot->yandex_maps_url) {
-            $keyboard[] = [
-                ['text' => (string) $reviewButton, 'url' => (string) $bot->yandex_maps_url],
-            ];
+            $yandexUrl = is_array($bot->yandex_maps_url) ? null : (string) $bot->yandex_maps_url;
+            if ($yandexUrl) {
+                $keyboard[] = [
+                    ['text' => $reviewButton, 'url' => $yandexUrl],
+                ];
+            }
         }
 
         return $keyboard;
@@ -52,8 +60,13 @@ class BotMenuService
         $keyboard = [];
         foreach ($categories as $category) {
             // Формируем текст кнопки с иконкой (если есть)
-            $icon = $category->icon ? (string) $category->icon . ' ' : '';
-            $name = (string) ($category->name ?? '');
+            $icon = $category->icon && !is_array($category->icon) ? (string) $category->icon . ' ' : '';
+            $name = is_array($category->name) ? '' : (string) ($category->name ?? '');
+            
+            if (empty($name)) {
+                continue; // Пропускаем категории без названия
+            }
+            
             $buttonText = $icon . $name;
             
             // Всегда используем callback_data для отправки файла
@@ -83,8 +96,14 @@ class BotMenuService
         $materials = $category->materials()->where('is_active', true)->get();
         
         foreach ($materials as $material) {
+            $title = is_array($material->title) ? '' : (string) ($material->title ?? '');
+            
+            if (empty($title)) {
+                continue; // Пропускаем материалы без названия
+            }
+            
             $keyboard[] = [
-                ['text' => (string) ($material->title ?? ''), 'callback_data' => BotActions::MATERIAL_DOWNLOAD . $material->id],
+                ['text' => $title, 'callback_data' => BotActions::MATERIAL_DOWNLOAD . $material->id],
             ];
         }
 

@@ -8,6 +8,7 @@ class BotActions
     const MENU_MATERIALS = 'menu_materials';
     const MENU_CONSULTATION = 'menu_consultation';
     const MENU_REVIEW = 'menu_review';
+    const DOWNLOAD_PRESENTATION = 'download_presentation';
     const BACK_MAIN_MENU = 'back_main_menu';
     
     // Materials actions

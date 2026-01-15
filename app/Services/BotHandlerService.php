@@ -92,6 +92,11 @@ class BotHandlerService
             return;
         }
 
+        // Проверяем, является ли сообщение текстом reply кнопки
+        if ($text && $this->handleReplyButton($bot, $user, $text)) {
+            return; // Обработано как reply кнопка
+        }
+
         // Обработка текстовых сообщений в зависимости от состояния
         if ($text && $user->current_state) {
             $this->handleState($bot, $user, $text, $message);
@@ -146,6 +151,8 @@ class BotHandlerService
             $this->startConsultationForm($bot, $user);
         } elseif ($data === BotActions::CONSULTATION_SKIP_DESCRIPTION) {
             $this->submitConsultation($bot, $user);
+        } elseif ($data === BotActions::DOWNLOAD_PRESENTATION) {
+            $this->sendPresentation($bot, $user);
         } elseif ($data === BotActions::BACK_MAIN_MENU || $data === BotActions::BACK_MATERIALS_LIST) {
             $this->showMainMenu($bot, $user);
         } elseif ($data === BotActions::CHECK_SUBSCRIPTION) {
@@ -315,6 +322,14 @@ class BotHandlerService
      */
     protected function showMainMenu(Bot $bot, BotUser $user): void
     {
+        $settings = $bot->settings ?? [];
+        $welcomeMedia = $settings['welcome_media'] ?? [];
+        
+        // Отправляем медиа перед сообщением, если оно настроено
+        if (!empty($welcomeMedia['type'])) {
+            $this->sendWelcomeMedia($bot, $user, $welcomeMedia);
+        }
+        
         $welcomeMessage = $bot->welcome_message ?? $this->getDefaultWelcomeMessage();
         
         // Проверяем, что welcome_message является строкой, а не массивом
@@ -322,16 +337,495 @@ class BotHandlerService
             ? $this->getDefaultWelcomeMessage()
             : (string) $welcomeMessage;
 
-        $keyboard = $this->menu->getMainMenuKeyboard($bot);
-
-        $this->telegram->sendMessageWithKeyboard(
-            $bot->token,
-            $user->telegram_user_id,
-            $welcomeMessage,
-            $keyboard
-        );
+        // Проверяем, нужно ли отправлять reply кнопки
+        $replyButtons = $settings['reply_buttons'] ?? [];
+        $hasReplyButtons = !empty($replyButtons['materials_button_text']) 
+            || !empty($replyButtons['consultation_button_text'])
+            || !empty($replyButtons['office_button_text']);
+        
+        if ($hasReplyButtons) {
+            // Отправляем с reply клавиатурой
+            $replyKeyboard = $this->buildReplyKeyboard($bot);
+            $this->telegram->sendMessageWithReplyKeyboard(
+                $bot->token,
+                $user->telegram_user_id,
+                $welcomeMessage,
+                $replyKeyboard
+            );
+        } else {
+            // Отправляем с inline клавиатурой (старый способ)
+            $keyboard = $this->menu->getMainMenuKeyboard($bot);
+            $this->telegram->sendMessageWithKeyboard(
+                $bot->token,
+                $user->telegram_user_id,
+                $welcomeMessage,
+                $keyboard
+            );
+        }
 
         $user->update(['current_state' => BotStates::MAIN_MENU]);
+    }
+
+    /**
+     * Построить reply клавиатуру
+     */
+    protected function buildReplyKeyboard(Bot $bot): array
+    {
+        $settings = $bot->settings ?? [];
+        $replyButtons = $settings['reply_buttons'] ?? [];
+        
+        $keyboard = [];
+        
+        // Кнопка 1: Полезные материалы и договора, презентации
+        if (!empty($replyButtons['materials_button_text'])) {
+            $buttonText = is_array($replyButtons['materials_button_text']) 
+                ? '📂 Полезные материалы и договора, презентации'
+                : (string) $replyButtons['materials_button_text'];
+            $keyboard[] = [['text' => $buttonText]];
+        }
+        
+        // Кнопка 2: Записаться на консультацию
+        if (!empty($replyButtons['consultation_button_text'])) {
+            $buttonText = is_array($replyButtons['consultation_button_text']) 
+                ? '📞 Записаться на консультацию'
+                : (string) $replyButtons['consultation_button_text'];
+            $keyboard[] = [['text' => $buttonText]];
+        }
+        
+        // Кнопка 3: Наш офис на Яндекс Картах
+        if (!empty($replyButtons['office_button_text'])) {
+            $buttonText = is_array($replyButtons['office_button_text']) 
+                ? '📍 Наш офис на Яндекс Картах'
+                : (string) $replyButtons['office_button_text'];
+            $keyboard[] = [['text' => $buttonText]];
+        }
+        
+        return $keyboard;
+    }
+
+    /**
+     * Отправить медиа перед приветственным сообщением
+     */
+    protected function sendWelcomeMedia(Bot $bot, BotUser $user, array $welcomeMedia): void
+    {
+        try {
+            $mediaType = $welcomeMedia['type'] ?? null;
+            
+            if ($mediaType === 'photo' || $mediaType === 'video') {
+                // Одно фото или видео
+                $mediaId = $welcomeMedia['media_id'] ?? null;
+                if (!$mediaId) {
+                    return;
+                }
+                
+                $media = \App\Models\Media::find($mediaId);
+                if (!$media || !$media->fileExists()) {
+                    Log::warning("Welcome media file not found", [
+                        'bot_id' => $bot->id,
+                        'media_id' => $mediaId,
+                    ]);
+                    return;
+                }
+                
+                $filePath = $media->fullPath;
+                
+                if ($mediaType === 'photo') {
+                    // Используем file_id если есть, иначе отправляем файл
+                    if ($media->telegram_file_id) {
+                        $this->telegram->sendPhotoByFileId(
+                            $bot->token,
+                            $user->telegram_user_id,
+                            $media->telegram_file_id
+                        );
+                    } else {
+                        $result = $this->telegram->sendPhoto(
+                            $bot->token,
+                            $user->telegram_user_id,
+                            $filePath
+                        );
+                        
+                        // Сохраняем file_id для будущих отправок
+                        if ($result['success'] && isset($result['data']['photo'])) {
+                            $photos = $result['data']['photo'];
+                            $largestPhoto = end($photos); // Берем самое большое фото
+                            if (isset($largestPhoto['file_id'])) {
+                                $media->telegram_file_id = $largestPhoto['file_id'];
+                                $media->save();
+                            }
+                        }
+                    }
+                } else {
+                    // Видео
+                    if ($media->telegram_file_id) {
+                        $this->telegram->sendVideoByFileId(
+                            $bot->token,
+                            $user->telegram_user_id,
+                            $media->telegram_file_id
+                        );
+                    } else {
+                        $result = $this->telegram->sendVideo(
+                            $bot->token,
+                            $user->telegram_user_id,
+                            $filePath
+                        );
+                        
+                        // Сохраняем file_id для будущих отправок
+                        if ($result['success'] && isset($result['data']['video']['file_id'])) {
+                            $media->telegram_file_id = $result['data']['video']['file_id'];
+                            $media->save();
+                        }
+                    }
+                }
+            } elseif ($mediaType === 'gallery') {
+                // Галерея фото (до 10)
+                $galleryIds = $welcomeMedia['gallery'] ?? [];
+                if (empty($galleryIds)) {
+                    return;
+                }
+                
+                // Ограничиваем до 10 фото
+                $galleryIds = array_slice($galleryIds, 0, 10);
+                
+                $mediaItems = \App\Models\Media::whereIn('id', $galleryIds)
+                    ->where('type', 'photo')
+                    ->get();
+                
+                if ($mediaItems->isEmpty()) {
+                    return;
+                }
+                
+                // Если только одно фото, отправляем его отдельно
+                if ($mediaItems->count() === 1) {
+                    $media = $mediaItems->first();
+                    if (!$media->fileExists()) {
+                        return;
+                    }
+                    
+                    if ($media->telegram_file_id) {
+                        $this->telegram->sendPhotoByFileId(
+                            $bot->token,
+                            $user->telegram_user_id,
+                            $media->telegram_file_id
+                        );
+                    } else {
+                        $result = $this->telegram->sendPhoto(
+                            $bot->token,
+                            $user->telegram_user_id,
+                            $media->fullPath
+                        );
+                        
+                        // Сохраняем file_id для будущих отправок
+                        if ($result['success'] && isset($result['data']['photo'])) {
+                            $photos = $result['data']['photo'];
+                            $largestPhoto = end($photos);
+                            if (isset($largestPhoto['file_id'])) {
+                                $media->telegram_file_id = $largestPhoto['file_id'];
+                                $media->save();
+                            }
+                        }
+                    }
+                    return;
+                }
+                
+                // Для нескольких фото формируем медиа-группу
+                // Сначала получаем file_id для всех фото, которые его не имеют
+                foreach ($mediaItems as $media) {
+                    if (!$media->fileExists()) {
+                        continue;
+                    }
+                    
+                    // Если нет file_id, отправляем фото отдельно, чтобы получить его
+                    if (!$media->telegram_file_id) {
+                        $result = $this->telegram->sendPhoto(
+                            $bot->token,
+                            $user->telegram_user_id,
+                            $media->fullPath
+                        );
+                        
+                        if ($result['success'] && isset($result['data']['photo'])) {
+                            $photos = $result['data']['photo'];
+                            $largestPhoto = end($photos);
+                            if (isset($largestPhoto['file_id'])) {
+                                $media->telegram_file_id = $largestPhoto['file_id'];
+                                $media->save();
+                            }
+                        }
+                    }
+                }
+                
+                // Формируем массив медиа для отправки медиа-группы
+                $mediaGroup = [];
+                foreach ($mediaItems as $index => $media) {
+                    if (!$media->telegram_file_id) {
+                        continue; // Пропускаем если нет file_id
+                    }
+                    
+                    $mediaGroup[] = [
+                        'type' => 'photo',
+                        'media' => $media->telegram_file_id,
+                    ];
+                }
+                
+                // Отправляем медиа-группу только если есть хотя бы 2 фото
+                if (count($mediaGroup) > 1) {
+                    $this->telegram->sendMediaGroup(
+                        $bot->token,
+                        $user->telegram_user_id,
+                        $mediaGroup
+                    );
+                } elseif (count($mediaGroup) === 1) {
+                    // Если осталось только одно фото, отправляем его отдельно
+                    $this->telegram->sendPhotoByFileId(
+                        $bot->token,
+                        $user->telegram_user_id,
+                        $mediaGroup[0]['media']
+                    );
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error("Error sending welcome media: " . $e->getMessage(), [
+                'bot_id' => $bot->id,
+                'user_id' => $user->telegram_user_id,
+                'exception' => $e,
+            ]);
+            // Продолжаем отправку сообщения даже если медиа не отправилось
+        }
+    }
+
+    /**
+     * Отправить презентацию пользователю
+     */
+    protected function sendPresentation(Bot $bot, BotUser $user): void
+    {
+        $settings = $bot->settings ?? [];
+        $presentation = $settings['presentation'] ?? [];
+        $presentationMediaId = $presentation['media_id'] ?? null;
+        
+        if (!$presentationMediaId) {
+            $this->telegram->sendMessage(
+                $bot->token,
+                $user->telegram_user_id,
+                'Презентация не найдена'
+            );
+            return;
+        }
+        
+        $media = \App\Models\Media::find($presentationMediaId);
+        if (!$media || !$media->fileExists()) {
+            Log::warning("Presentation file not found", [
+                'bot_id' => $bot->id,
+                'media_id' => $presentationMediaId,
+            ]);
+            $this->telegram->sendMessage(
+                $bot->token,
+                $user->telegram_user_id,
+                'Файл презентации не найден'
+            );
+            return;
+        }
+        
+        $filePath = $media->fullPath;
+        
+        // Отправляем документ
+        $result = $this->telegram->sendDocument(
+            $bot->token,
+            $user->telegram_user_id,
+            $filePath,
+            '📥 Презентация'
+        );
+        
+        if (!$result['success']) {
+            $this->telegram->sendMessage(
+                $bot->token,
+                $user->telegram_user_id,
+                $result['message'] ?? 'Не удалось отправить презентацию'
+            );
+        } else {
+            // Сохраняем file_id для будущих отправок
+            if (isset($result['data']['document']['file_id'])) {
+                $media->telegram_file_id = $result['data']['document']['file_id'];
+                $media->save();
+            }
+        }
+    }
+
+    /**
+     * Обработать reply кнопку
+     */
+    protected function handleReplyButton(Bot $bot, BotUser $user, string $text): bool
+    {
+        $settings = $bot->settings ?? [];
+        $replyButtons = $settings['reply_buttons'] ?? [];
+        
+        // Кнопка 1: Полезные материалы и договора, презентации
+        $materialsButtonText = $replyButtons['materials_button_text'] ?? '';
+        if (!empty($materialsButtonText)) {
+            $materialsButtonText = is_array($materialsButtonText) ? '' : (string) $materialsButtonText;
+            if ($text === $materialsButtonText) {
+                $this->sendMaterialsFiles($bot, $user);
+                return true;
+            }
+        }
+        
+        // Кнопка 2: Записаться на консультацию
+        $consultationButtonText = $replyButtons['consultation_button_text'] ?? '';
+        if (!empty($consultationButtonText)) {
+            $consultationButtonText = is_array($consultationButtonText) ? '' : (string) $consultationButtonText;
+            if ($text === $consultationButtonText) {
+                $this->showConsultationDescription($bot, $user);
+                return true;
+            }
+        }
+        
+        // Кнопка 3: Наш офис на Яндекс Картах
+        $officeButtonText = $replyButtons['office_button_text'] ?? '';
+        if (!empty($officeButtonText)) {
+            $officeButtonText = is_array($officeButtonText) ? '' : (string) $officeButtonText;
+            if ($text === $officeButtonText) {
+                $this->sendOfficeLocation($bot, $user);
+                return true;
+            }
+        }
+        
+        return false; // Не является reply кнопкой
+    }
+
+    /**
+     * Отправить файлы материалов
+     */
+    protected function sendMaterialsFiles(Bot $bot, BotUser $user): void
+    {
+        $settings = $bot->settings ?? [];
+        $replyButtons = $settings['reply_buttons'] ?? [];
+        $materialsFiles = $replyButtons['materials_files'] ?? [];
+        
+        if (empty($materialsFiles)) {
+            $this->telegram->sendMessage(
+                $bot->token,
+                $user->telegram_user_id,
+                'Файлы не найдены'
+            );
+            return;
+        }
+        
+        $mediaItems = \App\Models\Media::whereIn('id', $materialsFiles)->get();
+        
+        if ($mediaItems->isEmpty()) {
+            $this->telegram->sendMessage(
+                $bot->token,
+                $user->telegram_user_id,
+                'Файлы не найдены'
+            );
+            return;
+        }
+        
+        foreach ($mediaItems as $media) {
+            if (!$media->fileExists()) {
+                continue;
+            }
+            
+            $filePath = $media->fullPath;
+            
+            // Определяем тип файла и отправляем соответствующим методом
+            if ($media->type === 'photo') {
+                if ($media->telegram_file_id) {
+                    $this->telegram->sendPhotoByFileId(
+                        $bot->token,
+                        $user->telegram_user_id,
+                        $media->telegram_file_id
+                    );
+                } else {
+                    $result = $this->telegram->sendPhoto(
+                        $bot->token,
+                        $user->telegram_user_id,
+                        $filePath
+                    );
+                    if ($result['success'] && isset($result['data']['photo'])) {
+                        $photos = $result['data']['photo'];
+                        $largestPhoto = end($photos);
+                        if (isset($largestPhoto['file_id'])) {
+                            $media->telegram_file_id = $largestPhoto['file_id'];
+                            $media->save();
+                        }
+                    }
+                }
+            } elseif ($media->type === 'video') {
+                if ($media->telegram_file_id) {
+                    $this->telegram->sendVideoByFileId(
+                        $bot->token,
+                        $user->telegram_user_id,
+                        $media->telegram_file_id
+                    );
+                } else {
+                    $result = $this->telegram->sendVideo(
+                        $bot->token,
+                        $user->telegram_user_id,
+                        $filePath
+                    );
+                    if ($result['success'] && isset($result['data']['video']['file_id'])) {
+                        $media->telegram_file_id = $result['data']['video']['file_id'];
+                        $media->save();
+                    }
+                }
+            } else {
+                // Отправляем как документ
+                $result = $this->telegram->sendDocument(
+                    $bot->token,
+                    $user->telegram_user_id,
+                    $filePath,
+                    $media->original_name ?? 'Файл'
+                );
+                
+                if ($result['success'] && isset($result['data']['document']['file_id'])) {
+                    $media->telegram_file_id = $result['data']['document']['file_id'];
+                    $media->save();
+                }
+            }
+            
+            // Небольшая задержка между отправками
+            usleep(500000); // 0.5 секунды
+        }
+    }
+
+    /**
+     * Отправить локацию офиса
+     */
+    protected function sendOfficeLocation(Bot $bot, BotUser $user): void
+    {
+        $settings = $bot->settings ?? [];
+        $officeLocation = $settings['office_location'] ?? [];
+        
+        $latitude = $officeLocation['latitude'] ?? null;
+        $longitude = $officeLocation['longitude'] ?? null;
+        $address = $officeLocation['address'] ?? '';
+        
+        if ($latitude && $longitude) {
+            // Отправляем карту
+            $this->telegram->sendLocation(
+                $bot->token,
+                $user->telegram_user_id,
+                (float) $latitude,
+                (float) $longitude
+            );
+        }
+        
+        // Отправляем адрес текстом
+        if (!empty($address)) {
+            $addressText = is_array($address) ? '' : (string) $address;
+            if ($addressText) {
+                $this->telegram->sendMessage(
+                    $bot->token,
+                    $user->telegram_user_id,
+                    "📍 " . $addressText
+                );
+            }
+        } else {
+            $this->telegram->sendMessage(
+                $bot->token,
+                $user->telegram_user_id,
+                'Адрес офиса не указан'
+            );
+        }
     }
 
     /**

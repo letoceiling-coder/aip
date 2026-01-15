@@ -35,6 +35,18 @@ class BotMenuService
             ],
         ];
 
+        // Добавляем кнопку "Скачать презентацию" если файл выбран
+        $presentation = $settings['presentation'] ?? [];
+        $presentationMediaId = $presentation['media_id'] ?? null;
+        if ($presentationMediaId) {
+            $presentationButton = $menu['presentation_button'] ?? '📥 Скачать презентацию';
+            $presentationButton = is_array($presentationButton) ? '📥 Скачать презентацию' : (string) $presentationButton;
+            
+            $keyboard[] = [
+                ['text' => $presentationButton, 'callback_data' => BotActions::DOWNLOAD_PRESENTATION],
+            ];
+        }
+
         if ($bot->yandex_maps_url) {
             $yandexUrl = is_array($bot->yandex_maps_url) ? null : (string) $bot->yandex_maps_url;
             if ($yandexUrl) {

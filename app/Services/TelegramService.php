@@ -329,6 +329,126 @@ class TelegramService
     }
 
     /**
+     * Отправить сообщение с reply клавиатурой (кнопки под полем ввода)
+     */
+    public function sendMessageWithReplyKeyboard(
+        string $token,
+        int|string $chatId,
+        string $text,
+        array $keyboard = [],
+        bool $resizeKeyboard = true,
+        bool $oneTimeKeyboard = false,
+        array $options = []
+    ): array {
+        // Валидация и очистка клавиатуры
+        $cleanedKeyboard = [];
+        foreach ($keyboard as $row) {
+            $cleanedRow = [];
+            foreach ($row as $button) {
+                if (!isset($button['text']) || empty($button['text'])) {
+                    Log::warning('⚠️ Skipping reply button with empty or missing text', ['button' => $button]);
+                    continue;
+                }
+                
+                $cleanedRow[] = [
+                    'text' => (string) $button['text'],
+                ];
+            }
+            
+            if (!empty($cleanedRow)) {
+                $cleanedKeyboard[] = $cleanedRow;
+            }
+        }
+        
+        $replyMarkup = null;
+        if (!empty($cleanedKeyboard)) {
+            $replyMarkup = [
+                'keyboard' => $cleanedKeyboard,
+                'resize_keyboard' => $resizeKeyboard,
+                'one_time_keyboard' => $oneTimeKeyboard,
+            ];
+        }
+        
+        $params = array_merge($options, [
+            'reply_markup' => $replyMarkup ? json_encode($replyMarkup) : null,
+        ]);
+        
+        Log::info('📤 Sending message with reply keyboard', [
+            'chat_id' => $chatId,
+            'keyboard_rows' => count($cleanedKeyboard),
+            'keyboard' => $cleanedKeyboard,
+        ]);
+        
+        return $this->sendMessage($token, $chatId, $text, $params);
+    }
+
+    /**
+     * Удалить reply клавиатуру
+     */
+    public function removeReplyKeyboard(
+        string $token,
+        int|string $chatId,
+        string $text = '',
+        array $options = []
+    ): array {
+        $params = array_merge($options, [
+            'reply_markup' => json_encode([
+                'remove_keyboard' => true,
+            ]),
+        ]);
+        
+        return $this->sendMessage($token, $chatId, $text, $params);
+    }
+
+    /**
+     * Отправить локацию (карту)
+     */
+    public function sendLocation(
+        string $token,
+        int|string $chatId,
+        float $latitude,
+        float $longitude,
+        array $options = []
+    ): array {
+        try {
+            $params = array_merge([
+                'chat_id' => $chatId,
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+            ], $options);
+
+            $response = Http::timeout(10)->post($this->apiBaseUrl . $token . '/sendLocation', $params);
+            
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                if ($data['ok'] ?? false) {
+                    return [
+                        'success' => true,
+                        'data' => $data['result'] ?? [],
+                    ];
+                }
+                
+                return [
+                    'success' => false,
+                    'message' => $data['description'] ?? 'Не удалось отправить локацию',
+                ];
+            }
+            
+            return [
+                'success' => false,
+                'message' => 'Ошибка подключения к Telegram API',
+            ];
+        } catch (\Exception $e) {
+            Log::error('Telegram sendLocation error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Ошибка: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
      * Отправить документ
      */
     public function sendDocument(
@@ -529,6 +649,278 @@ class TelegramService
             ];
         } catch (\Exception $e) {
             Log::error('Telegram answerCallbackQuery error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Ошибка: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Отправить фото
+     */
+    public function sendPhoto(
+        string $token,
+        int|string $chatId,
+        string $photoPath,
+        ?string $caption = null,
+        array $options = []
+    ): array {
+        try {
+            if (!file_exists($photoPath)) {
+                return [
+                    'success' => false,
+                    'message' => 'Файл не найден',
+                ];
+            }
+
+            $params = [
+                'chat_id' => $chatId,
+            ];
+            
+            if ($caption !== null) {
+                $params['caption'] = $caption;
+            }
+
+            $params = array_merge($params, $options);
+
+            $response = Http::timeout(30)
+                ->attach('photo', file_get_contents($photoPath), basename($photoPath))
+                ->asMultipart()
+                ->post($this->apiBaseUrl . $token . '/sendPhoto', $params);
+            
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                if ($data['ok'] ?? false) {
+                    return [
+                        'success' => true,
+                        'data' => $data['result'] ?? [],
+                    ];
+                }
+                
+                return [
+                    'success' => false,
+                    'message' => $data['description'] ?? 'Не удалось отправить фото',
+                ];
+            }
+            
+            return [
+                'success' => false,
+                'message' => 'Ошибка подключения к Telegram API',
+            ];
+        } catch (\Exception $e) {
+            Log::error('Telegram sendPhoto error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Ошибка: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Отправить фото по file_id (Telegram)
+     */
+    public function sendPhotoByFileId(
+        string $token,
+        int|string $chatId,
+        string $fileId,
+        ?string $caption = null,
+        array $options = []
+    ): array {
+        try {
+            $params = array_merge([
+                'chat_id' => $chatId,
+                'photo' => $fileId,
+            ], $options);
+            
+            if ($caption !== null) {
+                $params['caption'] = $caption;
+            }
+
+            $response = Http::timeout(10)->post($this->apiBaseUrl . $token . '/sendPhoto', $params);
+            
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                if ($data['ok'] ?? false) {
+                    return [
+                        'success' => true,
+                        'data' => $data['result'] ?? [],
+                    ];
+                }
+                
+                return [
+                    'success' => false,
+                    'message' => $data['description'] ?? 'Не удалось отправить фото',
+                ];
+            }
+            
+            return [
+                'success' => false,
+                'message' => 'Ошибка подключения к Telegram API',
+            ];
+        } catch (\Exception $e) {
+            Log::error('Telegram sendPhotoByFileId error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Ошибка: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Отправить видео
+     */
+    public function sendVideo(
+        string $token,
+        int|string $chatId,
+        string $videoPath,
+        ?string $caption = null,
+        array $options = []
+    ): array {
+        try {
+            if (!file_exists($videoPath)) {
+                return [
+                    'success' => false,
+                    'message' => 'Файл не найден',
+                ];
+            }
+
+            $params = [
+                'chat_id' => $chatId,
+            ];
+            
+            if ($caption !== null) {
+                $params['caption'] = $caption;
+            }
+
+            $params = array_merge($params, $options);
+
+            $response = Http::timeout(60)
+                ->attach('video', file_get_contents($videoPath), basename($videoPath))
+                ->asMultipart()
+                ->post($this->apiBaseUrl . $token . '/sendVideo', $params);
+            
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                if ($data['ok'] ?? false) {
+                    return [
+                        'success' => true,
+                        'data' => $data['result'] ?? [],
+                    ];
+                }
+                
+                return [
+                    'success' => false,
+                    'message' => $data['description'] ?? 'Не удалось отправить видео',
+                ];
+            }
+            
+            return [
+                'success' => false,
+                'message' => 'Ошибка подключения к Telegram API',
+            ];
+        } catch (\Exception $e) {
+            Log::error('Telegram sendVideo error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Ошибка: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Отправить видео по file_id (Telegram)
+     */
+    public function sendVideoByFileId(
+        string $token,
+        int|string $chatId,
+        string $fileId,
+        ?string $caption = null,
+        array $options = []
+    ): array {
+        try {
+            $params = array_merge([
+                'chat_id' => $chatId,
+                'video' => $fileId,
+            ], $options);
+            
+            if ($caption !== null) {
+                $params['caption'] = $caption;
+            }
+
+            $response = Http::timeout(10)->post($this->apiBaseUrl . $token . '/sendVideo', $params);
+            
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                if ($data['ok'] ?? false) {
+                    return [
+                        'success' => true,
+                        'data' => $data['result'] ?? [],
+                    ];
+                }
+                
+                return [
+                    'success' => false,
+                    'message' => $data['description'] ?? 'Не удалось отправить видео',
+                ];
+            }
+            
+            return [
+                'success' => false,
+                'message' => 'Ошибка подключения к Telegram API',
+            ];
+        } catch (\Exception $e) {
+            Log::error('Telegram sendVideoByFileId error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Ошибка: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Отправить медиа-группу (галерея фото/видео)
+     */
+    public function sendMediaGroup(
+        string $token,
+        int|string $chatId,
+        array $media,
+        array $options = []
+    ): array {
+        try {
+            $params = array_merge([
+                'chat_id' => $chatId,
+                'media' => json_encode($media),
+            ], $options);
+
+            $response = Http::timeout(60)->post($this->apiBaseUrl . $token . '/sendMediaGroup', $params);
+            
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                if ($data['ok'] ?? false) {
+                    return [
+                        'success' => true,
+                        'data' => $data['result'] ?? [],
+                    ];
+                }
+                
+                return [
+                    'success' => false,
+                    'message' => $data['description'] ?? 'Не удалось отправить медиа-группу',
+                ];
+            }
+            
+            return [
+                'success' => false,
+                'message' => 'Ошибка подключения к Telegram API',
+            ];
+        } catch (\Exception $e) {
+            Log::error('Telegram sendMediaGroup error: ' . $e->getMessage());
             return [
                 'success' => false,
                 'message' => 'Ошибка: ' . $e->getMessage(),

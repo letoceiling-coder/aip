@@ -126,13 +126,17 @@ class BotNotificationService
             $userInfo .= "\n🆔 <b>Telegram ID:</b> {$consultation->telegram_user_id}";
         }
         
-        $template = $notifications['consultation_template'] ?? 
-            "🔔 <b>Новая заявка на консультацию</b>\n\n" .
+        $defaultTemplate = "🔔 <b>Новая заявка на консультацию</b>\n\n" .
             "📋 <b>Имя:</b> {name}\n" .
             "📞 <b>Телефон:</b> {phone}\n" .
             "📝 <b>Описание:</b> {description}\n" .
             "📅 <b>Дата:</b> {date}\n" .
             "🤖 <b>Бот:</b> {bot_name}{user_info}";
+        
+        $template = $notifications['consultation_template'] ?? $defaultTemplate;
+        
+        // Проверяем, что шаблон является строкой, а не массивом
+        $template = is_array($template) ? $defaultTemplate : (string) $template;
         
         $date = $consultation->created_at->format('d.m.Y H:i');
         $description = $consultation->description ?: '(не указано)';
@@ -140,17 +144,17 @@ class BotNotificationService
         $message = str_replace(
             ['{name}', '{phone}', '{description}', '{date}', '{bot_name}', '{user_info}'],
             [
-                htmlspecialchars($consultation->name, ENT_QUOTES, 'UTF-8'),
-                htmlspecialchars($consultation->phone, ENT_QUOTES, 'UTF-8'),
+                htmlspecialchars($consultation->name ?? '', ENT_QUOTES, 'UTF-8'),
+                htmlspecialchars($consultation->phone ?? '', ENT_QUOTES, 'UTF-8'),
                 htmlspecialchars($description, ENT_QUOTES, 'UTF-8'),
                 $date,
-                htmlspecialchars($bot->name, ENT_QUOTES, 'UTF-8'),
+                htmlspecialchars($bot->name ?? '', ENT_QUOTES, 'UTF-8'),
                 $userInfo
             ],
             $template
         );
         
-        return $message;
+        return (string) $message;
     }
 }
 

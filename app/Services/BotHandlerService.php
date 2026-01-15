@@ -339,37 +339,24 @@ class BotHandlerService
             $welcomeMessage = (string) $welcomeMessage;
         }
 
-        // Проверяем, нужно ли отправлять reply кнопки
-        $replyButtons = $settings['reply_buttons'] ?? [];
-        $hasReplyButtons = !empty($replyButtons['materials_button_text']) 
-            || !empty($replyButtons['consultation_button_text'])
-            || !empty($replyButtons['office_button_text']);
-        
-        if ($hasReplyButtons) {
-            // Отправляем с reply клавиатурой
-            $replyKeyboard = $this->buildReplyKeyboard($bot);
-            $this->telegram->sendMessageWithReplyKeyboard(
-                $bot->token,
-                $user->telegram_user_id,
-                $welcomeMessage,
-                $replyKeyboard
-            );
-        } else {
-            // Отправляем с inline клавиатурой (старый способ)
-            $keyboard = $this->menu->getMainMenuKeyboard($bot);
-            $this->telegram->sendMessageWithKeyboard(
-                $bot->token,
-                $user->telegram_user_id,
-                $welcomeMessage,
-                $keyboard
-            );
-        }
+        // ОБЯЗАТЕЛЬНО отправляем reply клавиатуру с двумя обязательными кнопками:
+        // 1. Полезные материалы и договора, презентации
+        // 2. Записаться на консультацию
+        // Эти кнопки всегда присутствуют, независимо от настроек
+        $replyKeyboard = $this->buildReplyKeyboard($bot);
+        $this->telegram->sendMessageWithReplyKeyboard(
+            $bot->token,
+            $user->telegram_user_id,
+            $welcomeMessage,
+            $replyKeyboard
+        );
 
         $user->update(['current_state' => BotStates::MAIN_MENU]);
     }
 
     /**
      * Построить reply клавиатуру
+     * ОБЯЗАТЕЛЬНО включает две кнопки: Полезные материалы и Записаться на консультацию
      */
     protected function buildReplyKeyboard(Bot $bot): array
     {
@@ -378,28 +365,40 @@ class BotHandlerService
         
         $keyboard = [];
         
-        // Кнопка 1: Полезные материалы и договора, презентации
+        // ОБЯЗАТЕЛЬНАЯ Кнопка 1: Полезные материалы и договора, презентации
+        // Всегда добавляется, независимо от настроек
+        $materialsButtonText = '📂 Полезные материалы и договора, презентации';
         if (!empty($replyButtons['materials_button_text'])) {
-            $buttonText = is_array($replyButtons['materials_button_text']) 
+            $materialsButtonText = is_array($replyButtons['materials_button_text']) 
                 ? '📂 Полезные материалы и договора, презентации'
-                : (string) $replyButtons['materials_button_text'];
-            $keyboard[] = [['text' => $buttonText]];
+                : trim((string) $replyButtons['materials_button_text']);
+            if (empty($materialsButtonText)) {
+                $materialsButtonText = '📂 Полезные материалы и договора, презентации';
+            }
         }
+        $keyboard[] = [['text' => $materialsButtonText]];
         
-        // Кнопка 2: Записаться на консультацию
+        // ОБЯЗАТЕЛЬНАЯ Кнопка 2: Записаться на консультацию
+        // Всегда добавляется, независимо от настроек
+        $consultationButtonText = '📞 Записаться на консультацию';
         if (!empty($replyButtons['consultation_button_text'])) {
-            $buttonText = is_array($replyButtons['consultation_button_text']) 
+            $consultationButtonText = is_array($replyButtons['consultation_button_text']) 
                 ? '📞 Записаться на консультацию'
-                : (string) $replyButtons['consultation_button_text'];
-            $keyboard[] = [['text' => $buttonText]];
+                : trim((string) $replyButtons['consultation_button_text']);
+            if (empty($consultationButtonText)) {
+                $consultationButtonText = '📞 Записаться на консультацию';
+            }
         }
+        $keyboard[] = [['text' => $consultationButtonText]];
         
-        // Кнопка 3: Наш офис на Яндекс Картах
+        // Дополнительная Кнопка 3: Наш офис на Яндекс Картах (опциональная)
         if (!empty($replyButtons['office_button_text'])) {
             $buttonText = is_array($replyButtons['office_button_text']) 
                 ? '📍 Наш офис на Яндекс Картах'
-                : (string) $replyButtons['office_button_text'];
-            $keyboard[] = [['text' => $buttonText]];
+                : trim((string) $replyButtons['office_button_text']);
+            if (!empty($buttonText)) {
+                $keyboard[] = [['text' => $buttonText]];
+            }
         }
         
         return $keyboard;

@@ -1252,15 +1252,42 @@ class BotHandlerService
             $thankYouMessage = $consultationMsgs['thank_you'] ?? 
                 'Спасибо. Мы свяжемся с вами в ближайшее время.';
             
-            // Проверяем, что значение является строкой, а не массивом
-            $thankYouMessage = is_array($thankYouMessage)
-                ? 'Спасибо. Мы свяжемся с вами в ближайшее время.'
-                : (string) $thankYouMessage;
+            // Проверяем, что значение является строкой, а не массивом, и не пустое
+            if (is_array($thankYouMessage) || empty(trim((string) $thankYouMessage))) {
+                $thankYouMessage = 'Спасибо. Мы свяжемся с вами в ближайшее время.';
+            } else {
+                $thankYouMessage = trim((string) $thankYouMessage);
+            }
+            
+            Log::info('✅ Consultation form submitted', [
+                'bot_id' => $bot->id,
+                'user_id' => $user->telegram_user_id,
+                'consultation_id' => $consultation->id,
+                'thank_you_message' => $thankYouMessage,
+            ]);
 
-            $this->telegram->sendMessage($bot->token, $user->telegram_user_id, $thankYouMessage);
+            // Проверяем, есть ли reply кнопки, чтобы отправить сообщение с клавиатурой
+            $replyButtons = $settings['reply_buttons'] ?? [];
+            $hasReplyButtons = !empty($replyButtons['materials_button_text']) 
+                || !empty($replyButtons['consultation_button_text'])
+                || !empty($replyButtons['office_button_text']);
+            
+            if ($hasReplyButtons) {
+                // Отправляем сообщение благодарности с reply клавиатурой
+                $replyKeyboard = $this->buildReplyKeyboard($bot);
+                $this->telegram->sendMessageWithReplyKeyboard(
+                    $bot->token,
+                    $user->telegram_user_id,
+                    $thankYouMessage,
+                    $replyKeyboard
+                );
+            } else {
+                // Отправляем сообщение без клавиатуры
+                $this->telegram->sendMessage($bot->token, $user->telegram_user_id, $thankYouMessage);
+            }
 
-            // Возвращаем в главное меню
-            $this->showMainMenu($bot, $user);
+            // Обновляем состояние пользователя на главное меню (без отправки приветственного сообщения)
+            $user->update(['current_state' => BotStates::MAIN_MENU]);
         } catch (\Exception $e) {
             Log::error("Error submitting consultation: " . $e->getMessage());
             $this->telegram->sendMessage(

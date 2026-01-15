@@ -333,7 +333,7 @@ export default {
         }
         
         const handleCategorySaved = () => {
-            fetchCategories()
+                    fetchCategories()
         }
 
         const editMaterial = (material) => {

@@ -90,7 +90,8 @@ class BotController extends Controller
             ]);
 
             // Теперь формируем правильный webhook URL с ID бота
-            $webhookUrl = url('/api/telegram/webhook/' . $bot->id);
+            // Принудительно используем HTTPS, так как Telegram требует HTTPS для webhook
+            $webhookUrl = str_replace('http://', 'https://', url('/api/telegram/webhook/' . $bot->id));
             
             // Настройки webhook
             $webhookOptions = [
@@ -172,7 +173,8 @@ class BotController extends Controller
                 }
 
                 // Обновляем webhook URL с ID бота
-                $webhookUrl = url('/api/telegram/webhook/' . $bot->id);
+                // Принудительно используем HTTPS, так как Telegram требует HTTPS для webhook
+                $webhookUrl = str_replace('http://', 'https://', url('/api/telegram/webhook/' . $bot->id));
                 
                 // Настройки webhook из запроса или дефолтные
                 $allowedUpdates = $request->input('webhook.allowed_updates');
@@ -288,6 +290,14 @@ class BotController extends Controller
                 'is_active' => $bot->is_active,
             ]);
             
+            // Проверяем, активен ли бот
+            if (!$bot->is_active) {
+                \Illuminate\Support\Facades\Log::warning('⚠️ Bot is not active', [
+                    'bot_id' => $bot->id,
+                ]);
+                return response()->json(['ok' => true, 'message' => 'Bot is not active'], 200);
+            }
+            
             // Проверяем secret_token, если он установлен
             if (!empty($bot->settings['webhook']['secret_token'])) {
                 $secretToken = $request->header('X-Telegram-Bot-Api-Secret-Token');
@@ -371,7 +381,8 @@ class BotController extends Controller
         
         try {
             // Всегда используем правильный URL с ID бота, игнорируя сохраненный в БД
-            $webhookUrl = url('/api/telegram/webhook/' . $bot->id);
+            // Принудительно используем HTTPS, так как Telegram требует HTTPS для webhook
+            $webhookUrl = str_replace('http://', 'https://', url('/api/telegram/webhook/' . $bot->id));
             
             \Illuminate\Support\Facades\Log::info('🔧 Registering webhook', [
                 'bot_id' => $bot->id,

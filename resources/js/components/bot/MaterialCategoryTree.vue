@@ -36,6 +36,12 @@
                     </div>
                     <div class="flex gap-2">
                         <button
+                            @click="editCategory(category)"
+                            class="px-3 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded"
+                        >
+                            ✏️ Редактировать
+                        </button>
+                        <button
                             v-if="!category.media_id"
                             @click="selectCategoryFile(category)"
                             class="px-3 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded"
@@ -92,6 +98,12 @@
                 </div>
                 <div v-else class="text-sm text-muted-foreground p-3">
                     Нет материалов
+                    <button
+                        @click="showMaterialModal(category)"
+                        class="ml-2 px-3 py-1 text-xs bg-accent/10 text-accent border border-accent/40 hover:bg-accent/20 rounded"
+                    >
+                        + Добавить материал
+                    </button>
                 </div>
             </div>
 
@@ -99,6 +111,16 @@
                 Категории не найдены. Создайте первую категорию.
             </div>
         </div>
+
+        <!-- Material Form Modal -->
+        <MaterialForm
+            v-if="showMaterialForm"
+            :bot-id="botId"
+            :category-id="selectedCategory?.id || selectedMaterial?.category_id"
+            :material="selectedMaterial"
+            @close="handleMaterialFormClose"
+            @saved="handleMaterialSaved"
+        />
 
         <!-- Create Category Modal -->
         <div v-if="showCategoryModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
@@ -470,6 +492,16 @@ export default {
             }
         }
 
+        const handleMaterialFormClose = () => {
+            showMaterialForm.value = false
+            selectedMaterial.value = null
+            selectedCategory.value = null
+        }
+
+        const handleMaterialSaved = () => {
+            fetchCategories()
+        }
+
         const formatFileSize = (bytes) => {
             if (!bytes) return '0 B'
             const k = 1024
@@ -501,6 +533,8 @@ export default {
             selectedCategoryForFile,
             handleFileSelected,
             removeCategoryFile,
+            handleMaterialFormClose,
+            handleMaterialSaved,
         }
     },
 }

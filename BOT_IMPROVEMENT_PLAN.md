@@ -273,3 +273,5 @@ $text = $consultation['description'] ??
 **Статус:** Готов к реализации
 
 
+
+

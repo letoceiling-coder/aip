@@ -149,11 +149,34 @@ class BotManagementController extends Controller
         // Обновляем settings JSON
         $settings = $bot->settings ?? [];
         if (isset($validated['settings'])) {
+            // Обновляем messages (заменяем полностью, не мержим)
             if (isset($validated['settings']['messages'])) {
-                $settings['messages'] = array_merge_recursive($settings['messages'] ?? [], $validated['settings']['messages']);
+                $settings['messages'] = array_merge($settings['messages'] ?? [], $validated['settings']['messages']);
             }
+            
+            // Обновляем other_settings
             if (isset($validated['settings']['other_settings'])) {
                 $settings['other_settings'] = array_merge($settings['other_settings'] ?? [], $validated['settings']['other_settings']);
+            }
+            
+            // Обновляем welcome_media
+            if (isset($validated['settings']['welcome_media'])) {
+                $settings['welcome_media'] = $validated['settings']['welcome_media'];
+            }
+            
+            // Обновляем presentation
+            if (isset($validated['settings']['presentation'])) {
+                $settings['presentation'] = $validated['settings']['presentation'];
+            }
+            
+            // Обновляем reply_buttons
+            if (isset($validated['settings']['reply_buttons'])) {
+                $settings['reply_buttons'] = $validated['settings']['reply_buttons'];
+            }
+            
+            // Обновляем office_location
+            if (isset($validated['settings']['office_location'])) {
+                $settings['office_location'] = $validated['settings']['office_location'];
             }
         }
         $bot->settings = $settings;

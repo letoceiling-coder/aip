@@ -21,11 +21,25 @@ class BotMenuService
         $consultationButton = $menu['consultation_button'] ?? '📞 Записаться на консультацию';
         $reviewButton = $menu['review_button'] ?? 'Оставь отзыв на Яндекс Картах';
 
-        // Проверяем, что значения являются строками, а не массивами
-        $materialsButton = is_array($materialsButton) ? '📂 Полезные материалы и договоры' : (string) $materialsButton;
-        $consultationButton = is_array($consultationButton) ? '📞 Записаться на консультацию' : (string) $consultationButton;
+        // Проверяем, что значения являются строками, а не массивами, и не пустые
+        // ОБЯЗАТЕЛЬНЫЕ кнопки всегда должны иметь текст
+        if (is_array($materialsButton) || empty(trim((string) $materialsButton))) {
+            $materialsButton = '📂 Полезные материалы и договоры';
+        } else {
+            $materialsButton = trim((string) $materialsButton);
+        }
+        
+        if (is_array($consultationButton) || empty(trim((string) $consultationButton))) {
+            $consultationButton = '📞 Записаться на консультацию';
+        } else {
+            $consultationButton = trim((string) $consultationButton);
+        }
+        
         $reviewButton = is_array($reviewButton) ? 'Оставь отзыв на Яндекс Картах' : (string) $reviewButton;
 
+        // ОБЯЗАТЕЛЬНО всегда возвращаем две кнопки:
+        // 1. Полезные материалы и договоры
+        // 2. Записаться на консультацию
         $keyboard = [
             [
                 ['text' => $materialsButton, 'callback_data' => BotActions::MENU_MATERIALS],

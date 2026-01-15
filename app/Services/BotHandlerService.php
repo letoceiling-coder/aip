@@ -339,16 +339,16 @@ class BotHandlerService
             $welcomeMessage = (string) $welcomeMessage;
         }
 
-        // ОБЯЗАТЕЛЬНО отправляем reply клавиатуру с двумя обязательными кнопками:
-        // 1. Полезные материалы и договора, презентации
+        // ОБЯЗАТЕЛЬНО отправляем inline клавиатуру с двумя обязательными кнопками:
+        // 1. Полезные материалы и договоры
         // 2. Записаться на консультацию
         // Эти кнопки всегда присутствуют, независимо от настроек
-        $replyKeyboard = $this->buildReplyKeyboard($bot);
-        $this->telegram->sendMessageWithReplyKeyboard(
+        $keyboard = $this->menu->getMainMenuKeyboard($bot);
+        $this->telegram->sendMessageWithKeyboard(
             $bot->token,
             $user->telegram_user_id,
             $welcomeMessage,
-            $replyKeyboard
+            $keyboard
         );
 
         $user->update(['current_state' => BotStates::MAIN_MENU]);

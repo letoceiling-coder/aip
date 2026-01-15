@@ -564,7 +564,9 @@ class BotHandlerService
         $messages = $settings['messages'] ?? [];
         $consultation = $messages['consultation'] ?? [];
 
-        $text = $consultation['form_name_label'] ?? 'Введите ваше имя:';
+        $formNameLabel = $consultation['form_name_label'] ?? 'Введите ваше имя:';
+        // Проверяем, что значение является строкой, а не массивом
+        $text = is_array($formNameLabel) ? 'Введите ваше имя:' : (string) $formNameLabel;
 
         $this->telegram->sendMessage($bot->token, $user->telegram_user_id, $text);
 
@@ -616,7 +618,9 @@ class BotHandlerService
         $messages = $settings['messages'] ?? [];
         $consultation = $messages['consultation'] ?? [];
 
-        $text = $consultation['form_phone_label'] ?? 'Введите ваш телефон:';
+        $formPhoneLabel = $consultation['form_phone_label'] ?? 'Введите ваш телефон:';
+        // Проверяем, что значение является строкой, а не массивом
+        $text = is_array($formPhoneLabel) ? 'Введите ваш телефон:' : (string) $formPhoneLabel;
         $this->telegram->sendMessage($bot->token, $user->telegram_user_id, $text);
 
         $user->update(['current_state' => BotStates::CONSULTATION_FORM_PHONE]);
@@ -642,7 +646,13 @@ class BotHandlerService
         $consultation = $messages['consultation'] ?? [];
 
         $skipButton = $consultation['skip_description_button'] ?? 'Пропустить';
-        $text = $consultation['form_description_label'] ?? 'Краткое описание запроса (опционально, можете пропустить):';
+        $formDescriptionLabel = $consultation['form_description_label'] ?? 'Краткое описание запроса (опционально, можете пропустить):';
+        
+        // Проверяем, что значения являются строками, а не массивами
+        $skipButton = is_array($skipButton) ? 'Пропустить' : (string) $skipButton;
+        $text = is_array($formDescriptionLabel) 
+            ? 'Краткое описание запроса (опционально, можете пропустить):'
+            : (string) $formDescriptionLabel;
 
         $keyboard = [
             [['text' => $skipButton, 'callback_data' => BotActions::CONSULTATION_SKIP_DESCRIPTION]]
@@ -689,6 +699,11 @@ class BotHandlerService
 
             $thankYouMessage = $consultationMsgs['thank_you'] ?? 
                 'Спасибо. Мы свяжемся с вами в ближайшее время.';
+            
+            // Проверяем, что значение является строкой, а не массивом
+            $thankYouMessage = is_array($thankYouMessage)
+                ? 'Спасибо. Мы свяжемся с вами в ближайшее время.'
+                : (string) $thankYouMessage;
 
             $this->telegram->sendMessage($bot->token, $user->telegram_user_id, $thankYouMessage);
 

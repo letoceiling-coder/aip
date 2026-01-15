@@ -660,7 +660,7 @@ class BotHandlerService
         // Кнопка 1: Полезные материалы и договора, презентации
         $materialsButtonText = $replyButtons['materials_button_text'] ?? '';
         if (!empty($materialsButtonText)) {
-            $materialsButtonText = is_array($materialsButtonText) ? '' : (string) $materialsButtonText;
+            $materialsButtonText = is_array($materialsButtonText) ? '' : trim((string) $materialsButtonText);
             if ($text === $materialsButtonText) {
                 $this->sendMaterialsFiles($bot, $user);
                 return true;
@@ -670,9 +670,17 @@ class BotHandlerService
         // Кнопка 2: Записаться на консультацию
         $consultationButtonText = $replyButtons['consultation_button_text'] ?? '';
         if (!empty($consultationButtonText)) {
-            $consultationButtonText = is_array($consultationButtonText) ? '' : (string) $consultationButtonText;
-            if ($text === $consultationButtonText) {
-                $this->showConsultationDescription($bot, $user);
+            $consultationButtonText = is_array($consultationButtonText) ? '' : trim((string) $consultationButtonText);
+            // Сравниваем с удалением пробелов для надежности
+            if (trim($text) === $consultationButtonText) {
+                Log::info("Reply button consultation clicked", [
+                    'bot_id' => $bot->id,
+                    'user_id' => $user->telegram_user_id,
+                    'button_text' => $consultationButtonText,
+                    'received_text' => $text,
+                ]);
+                // Сразу начинаем форму записи на консультацию
+                $this->startConsultationForm($bot, $user);
                 return true;
             }
         }
@@ -680,8 +688,8 @@ class BotHandlerService
         // Кнопка 3: Наш офис на Яндекс Картах
         $officeButtonText = $replyButtons['office_button_text'] ?? '';
         if (!empty($officeButtonText)) {
-            $officeButtonText = is_array($officeButtonText) ? '' : (string) $officeButtonText;
-            if ($text === $officeButtonText) {
+            $officeButtonText = is_array($officeButtonText) ? '' : trim((string) $officeButtonText);
+            if (trim($text) === $officeButtonText) {
                 $this->sendOfficeLocation($bot, $user);
                 return true;
             }
@@ -1062,7 +1070,25 @@ class BotHandlerService
         // Проверяем, что значение является строкой, а не массивом
         $text = is_array($formNameLabel) ? 'Введите ваше имя:' : (string) $formNameLabel;
 
-        $this->telegram->sendMessage($bot->token, $user->telegram_user_id, $text);
+        // Проверяем, есть ли reply кнопки, чтобы сохранить их во время заполнения формы
+        $replyButtons = $settings['reply_buttons'] ?? [];
+        $hasReplyButtons = !empty($replyButtons['materials_button_text']) 
+            || !empty($replyButtons['consultation_button_text'])
+            || !empty($replyButtons['office_button_text']);
+        
+        if ($hasReplyButtons) {
+            // Отправляем с reply клавиатурой (сохраняем кнопки)
+            $replyKeyboard = $this->buildReplyKeyboard($bot);
+            $this->telegram->sendMessageWithReplyKeyboard(
+                $bot->token,
+                $user->telegram_user_id,
+                $text,
+                $replyKeyboard
+            );
+        } else {
+            // Отправляем без клавиатуры
+            $this->telegram->sendMessage($bot->token, $user->telegram_user_id, $text);
+        }
 
         $user->update(['current_state' => BotStates::CONSULTATION_FORM_NAME]);
     }
@@ -1148,10 +1174,12 @@ class BotHandlerService
             ? 'Краткое описание запроса (опционально, можете пропустить):'
             : (string) $formDescriptionLabel;
 
+        // Отправляем сообщение с inline кнопкой "Пропустить"
+        // Reply клавиатура остается активной (Telegram сохраняет ее до явного удаления)
         $keyboard = [
             [['text' => $skipButton, 'callback_data' => BotActions::CONSULTATION_SKIP_DESCRIPTION]]
         ];
-
+        
         $this->telegram->sendMessageWithKeyboard($bot->token, $user->telegram_user_id, $text, $keyboard);
 
         $user->update(['current_state' => BotStates::CONSULTATION_FORM_DESCRIPTION]);

@@ -45,6 +45,22 @@ class BotNotificationService
 
         $message = $this->formatConsultationMessage($bot, $consultation);
         
+        // Проверяем, что сообщение не пустое
+        if (empty(trim($message))) {
+            Log::error('❌ CRITICAL: Consultation message is empty after formatting', [
+                'bot_id' => $bot->id,
+                'consultation_id' => $consultation->id,
+            ]);
+            
+            // Используем минимальный шаблон
+            $message = "🔔 <b>Новая заявка на консультацию</b>\n\n" .
+                "📋 <b>Имя:</b> " . htmlspecialchars($consultation->name ?? 'Не указано', ENT_QUOTES, 'UTF-8') . "\n" .
+                "📞 <b>Телефон:</b> " . htmlspecialchars($consultation->phone ?? 'Не указано', ENT_QUOTES, 'UTF-8') . "\n" .
+                "📝 <b>Описание:</b> " . htmlspecialchars($consultation->description ?: '(не указано)', ENT_QUOTES, 'UTF-8') . "\n" .
+                "📅 <b>Дата:</b> " . $consultation->created_at->format('d.m.Y H:i') . "\n" .
+                "🤖 <b>Бот:</b> " . htmlspecialchars($bot->name ?? 'Не указано', ENT_QUOTES, 'UTF-8');
+        }
+        
         $successCount = 0;
         $failCount = 0;
         
@@ -53,6 +69,7 @@ class BotNotificationService
             'consultation_id' => $consultation->id,
             'admin_count' => count($adminIds),
             'admin_ids' => $adminIds,
+            'message_length' => strlen($message),
         ]);
         
         foreach ($adminIds as $adminId) {
@@ -255,8 +272,12 @@ class BotNotificationService
         
         $template = $notifications['consultation_template'] ?? $defaultTemplate;
         
-        // Проверяем, что шаблон является строкой, а не массивом
-        $template = is_array($template) ? $defaultTemplate : (string) $template;
+        // Проверяем, что шаблон является строкой, а не массивом, и не пустой
+        if (is_array($template) || empty(trim((string) $template))) {
+            $template = $defaultTemplate;
+        } else {
+            $template = trim((string) $template);
+        }
         
         $date = $consultation->created_at->format('d.m.Y H:i');
         $description = $consultation->description ?: '(не указано)';
@@ -274,7 +295,31 @@ class BotNotificationService
             $template
         );
         
-        return (string) $message;
+        $message = trim((string) $message);
+        
+        // Дополнительная проверка: если сообщение пустое, используем минимальный шаблон
+        if (empty($message)) {
+            Log::warning('⚠️ Generated consultation message is empty, using fallback', [
+                'bot_id' => $bot->id,
+                'consultation_id' => $consultation->id,
+                'template' => $template,
+            ]);
+            
+            $message = "🔔 <b>Новая заявка на консультацию</b>\n\n" .
+                "📋 <b>Имя:</b> " . htmlspecialchars($consultation->name ?? 'Не указано', ENT_QUOTES, 'UTF-8') . "\n" .
+                "📞 <b>Телефон:</b> " . htmlspecialchars($consultation->phone ?? 'Не указано', ENT_QUOTES, 'UTF-8') . "\n" .
+                "📝 <b>Описание:</b> " . htmlspecialchars($description, ENT_QUOTES, 'UTF-8') . "\n" .
+                "📅 <b>Дата:</b> {$date}\n" .
+                "🤖 <b>Бот:</b> " . htmlspecialchars($bot->name ?? 'Не указано', ENT_QUOTES, 'UTF-8') . $userInfo;
+        }
+        
+        Log::info('📝 Consultation message formatted', [
+            'bot_id' => $bot->id,
+            'consultation_id' => $consultation->id,
+            'message_length' => strlen($message),
+        ]);
+        
+        return $message;
     }
 }
 

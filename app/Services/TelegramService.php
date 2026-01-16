@@ -1012,5 +1012,123 @@ class TelegramService
             ];
         }
     }
+
+    /**
+     * Установить команды меню для бота
+     * Команды будут отображаться в нижней панели Telegram при нажатии на кнопку "/"
+     * 
+     * @param string $token Токен бота
+     * @param array $commands Массив команд в формате [['command' => 'start', 'description' => 'Запустить бота'], ...]
+     * @param string|null $scope Область действия команд (по умолчанию 'default' - для всех пользователей)
+     * @param string|null $languageCode Код языка для локализации команд
+     * @return array
+     */
+    public function setMyCommands(
+        string $token,
+        array $commands = [],
+        ?string $scope = null,
+        ?string $languageCode = null
+    ): array {
+        try {
+            // Если команды не переданы, используем команду по умолчанию
+            if (empty($commands)) {
+                $commands = [
+                    [
+                        'command' => 'start',
+                        'description' => 'Запустить бота',
+                    ],
+                ];
+            }
+
+            // Валидация команд
+            $validatedCommands = [];
+            foreach ($commands as $command) {
+                if (!isset($command['command']) || empty(trim($command['command']))) {
+                    Log::warning('⚠️ Skipping command with empty command name', ['command' => $command]);
+                    continue;
+                }
+                
+                $validatedCommands[] = [
+                    'command' => trim($command['command']),
+                    'description' => isset($command['description']) ? trim($command['description']) : '',
+                ];
+            }
+
+            if (empty($validatedCommands)) {
+                Log::warning('⚠️ No valid commands to set', ['original_commands' => $commands]);
+                return [
+                    'success' => false,
+                    'message' => 'Нет валидных команд для установки',
+                ];
+            }
+
+            $params = [
+                'commands' => json_encode($validatedCommands),
+            ];
+
+            // Добавляем scope, если указан
+            if ($scope !== null) {
+                $params['scope'] = json_encode($scope);
+            }
+
+            // Добавляем language_code, если указан
+            if ($languageCode !== null) {
+                $params['language_code'] = $languageCode;
+            }
+
+            Log::info('📤 Setting bot commands menu', [
+                'commands_count' => count($validatedCommands),
+                'commands' => $validatedCommands,
+                'scope' => $scope,
+                'language_code' => $languageCode,
+            ]);
+
+            $response = Http::timeout(10)->post($this->apiBaseUrl . $token . '/setMyCommands', $params);
+            
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                if ($data['ok'] ?? false) {
+                    Log::info('✅ Bot commands menu set successfully', [
+                        'commands_count' => count($validatedCommands),
+                    ]);
+                    return [
+                        'success' => true,
+                        'message' => 'Меню команд успешно установлено',
+                        'data' => $data['result'] ?? [],
+                    ];
+                }
+                
+                Log::error('❌ Telegram API returned error when setting commands', [
+                    'description' => $data['description'] ?? 'Unknown error',
+                    'error_code' => $data['error_code'] ?? null,
+                ]);
+                
+                return [
+                    'success' => false,
+                    'message' => $data['description'] ?? 'Не удалось установить меню команд',
+                ];
+            }
+            
+            Log::error('❌ HTTP error when setting bot commands', [
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+            
+            return [
+                'success' => false,
+                'message' => 'Ошибка подключения к Telegram API',
+            ];
+        } catch (\Exception $e) {
+            Log::error('❌ Exception when setting bot commands', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return [
+                'success' => false,
+                'message' => 'Ошибка: ' . $e->getMessage(),
+            ];
+        }
+    }
 }
 

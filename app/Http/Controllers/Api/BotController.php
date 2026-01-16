@@ -111,6 +111,15 @@ class BotController extends Controller
             $bot->webhook_registered = $webhookResult['success'] ?? false;
             $bot->save();
 
+            // Устанавливаем меню команд для бота (появляется в нижней панели Telegram)
+            $commands = [
+                [
+                    'command' => 'start',
+                    'description' => 'Запустить бота',
+                ],
+            ];
+            $this->telegramService->setMyCommands($bot->token, $commands);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Бот успешно зарегистрирован',
@@ -196,6 +205,15 @@ class BotController extends Controller
                 $bot->webhook_url = $webhookUrl;
                 $bot->webhook_registered = $webhookResult['success'] ?? false;
                 $bot->username = $botInfo['data']['username'] ?? null;
+
+                // Устанавливаем меню команд для бота (появляется в нижней панели Telegram)
+                $commands = [
+                    [
+                        'command' => 'start',
+                        'description' => 'Запустить бота',
+                    ],
+                ];
+                $this->telegramService->setMyCommands($request->token, $commands);
             }
 
             $bot->update($request->only([
@@ -205,6 +223,15 @@ class BotController extends Controller
                 'settings',
                 'is_active',
             ]));
+
+            // Устанавливаем меню команд при обновлении бота (на случай, если токен не изменился)
+            $commands = [
+                [
+                    'command' => 'start',
+                    'description' => 'Запустить бота',
+                ],
+            ];
+            $this->telegramService->setMyCommands($bot->token, $commands);
 
             return response()->json([
                 'success' => true,
@@ -435,6 +462,25 @@ class BotController extends Controller
                     'bot_id' => $bot->id,
                     'webhook_url' => $webhookUrl,
                 ]);
+
+                // Устанавливаем меню команд для бота (появляется в нижней панели Telegram)
+                $commands = [
+                    [
+                        'command' => 'start',
+                        'description' => 'Запустить бота',
+                    ],
+                ];
+                $commandsResult = $this->telegramService->setMyCommands($bot->token, $commands);
+                if ($commandsResult['success']) {
+                    \Illuminate\Support\Facades\Log::info('✅ Bot commands menu set successfully', [
+                        'bot_id' => $bot->id,
+                    ]);
+                } else {
+                    \Illuminate\Support\Facades\Log::warning('⚠️ Failed to set bot commands menu', [
+                        'bot_id' => $bot->id,
+                        'error' => $commandsResult['message'] ?? 'Unknown error',
+                    ]);
+                }
             } else {
                 \Illuminate\Support\Facades\Log::error('❌ Failed to register webhook', [
                     'bot_id' => $bot->id,

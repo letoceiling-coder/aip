@@ -379,18 +379,12 @@ class BotHandlerService
     /**
      * Восстановить reply кнопки главного меню без приветственного сообщения
      * Используется при возврате в меню из других разделов
+     * Reply кнопки уже установлены, просто обновляем состояние
      */
     protected function restoreMainMenuButtons(Bot $bot, BotUser $user): void
     {
-        // Только восстанавливаем reply кнопки, без отправки приветственного сообщения
-        $replyKeyboard = $this->buildReplyKeyboard($bot);
-        $this->telegram->sendMessageWithReplyKeyboard(
-            $bot->token,
-            $user->telegram_user_id,
-            'Выберите действие:',
-            $replyKeyboard
-        );
-        
+        // Reply кнопки уже установлены и остаются активными
+        // Просто обновляем состояние пользователя
         $user->update(['current_state' => BotStates::MAIN_MENU]);
     }
 
@@ -700,12 +694,25 @@ class BotHandlerService
         
         // Кнопка 1: Полезные материалы и договора, презентации
         $materialsButtonText = $replyButtons['materials_button_text'] ?? '';
+        $defaultMaterialsButtonText = '📂 Полезные материалы и договора, презентации';
+        
+        // Проверяем как настроенный текст, так и значение по умолчанию
         if (!empty($materialsButtonText)) {
             $materialsButtonText = is_array($materialsButtonText) ? '' : trim((string) $materialsButtonText);
-            if ($text === $materialsButtonText) {
-                $this->sendMaterialsFiles($bot, $user);
-                return true;
-            }
+        } else {
+            $materialsButtonText = $defaultMaterialsButtonText;
+        }
+        
+        if (trim($text) === $materialsButtonText || trim($text) === $defaultMaterialsButtonText) {
+            // Показываем список категорий материалов
+            Log::info('📂 Reply button materials clicked', [
+                'bot_id' => $bot->id,
+                'user_id' => $user->telegram_user_id,
+                'button_text' => $materialsButtonText,
+                'received_text' => $text,
+            ]);
+            $this->showMaterialsList($bot, $user);
+            return true;
         }
         
         // Кнопка 2: Записаться на консультацию

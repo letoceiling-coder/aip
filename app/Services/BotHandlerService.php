@@ -165,7 +165,7 @@ class BotHandlerService
         } elseif ($data === BotActions::DOWNLOAD_PRESENTATION) {
             $this->sendPresentation($bot, $user);
         } elseif ($data === BotActions::BACK_MAIN_MENU || $data === BotActions::BACK_MATERIALS_LIST) {
-            $this->showMainMenu($bot, $user);
+            $this->restoreMainMenuButtons($bot, $user);
         } elseif ($data === BotActions::CHECK_SUBSCRIPTION) {
             $this->checkSubscriptionAndProceed($bot, $user);
         }
@@ -373,6 +373,24 @@ class BotHandlerService
             );
         }
 
+        $user->update(['current_state' => BotStates::MAIN_MENU]);
+    }
+
+    /**
+     * Восстановить reply кнопки главного меню без приветственного сообщения
+     * Используется при возврате в меню из других разделов
+     */
+    protected function restoreMainMenuButtons(Bot $bot, BotUser $user): void
+    {
+        // Только восстанавливаем reply кнопки, без отправки приветственного сообщения
+        $replyKeyboard = $this->buildReplyKeyboard($bot);
+        $this->telegram->sendMessageWithReplyKeyboard(
+            $bot->token,
+            $user->telegram_user_id,
+            'Выберите действие:',
+            $replyKeyboard
+        );
+        
         $user->update(['current_state' => BotStates::MAIN_MENU]);
     }
 
@@ -1003,8 +1021,8 @@ class BotHandlerService
             );
         }
 
-        // Возвращаем в главное меню
-        $this->showMainMenu($bot, $user);
+        // Возвращаем в главное меню без приветственного сообщения
+        $this->restoreMainMenuButtons($bot, $user);
     }
 
     /**
@@ -1169,8 +1187,8 @@ class BotHandlerService
                 break;
 
             default:
-                // Неизвестное состояние
-                $this->showMainMenu($bot, $user);
+                // Неизвестное состояние - восстанавливаем кнопки меню без приветственного сообщения
+                $this->restoreMainMenuButtons($bot, $user);
         }
     }
 

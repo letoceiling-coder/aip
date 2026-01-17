@@ -34,3 +34,17 @@ Schedule::command('wow:send-reminders')
     ->everyFiveMinutes()
     ->withoutOverlapping()
     ->runInBackground();
+
+// Очистка отменённых заказов по TTL
+// Запускаем ежедневно в 02:00 для проверки и очистки отменённых заказов
+Schedule::command('orders:cleanup-cancelled')
+    ->dailyAt('02:00')
+    ->withoutOverlapping()
+    ->runInBackground();
+
+// Уведомления о неоплаченных заказах
+// Запускаем каждые 10 минут для проверки неоплаченных заказов
+Schedule::command('orders:notify-unpaid')
+    ->everyTenMinutes()
+    ->withoutOverlapping()
+    ->runInBackground();

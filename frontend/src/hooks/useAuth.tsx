@@ -26,9 +26,13 @@ export interface Application {
   propertyTitle: string;
   propertyImage: string;
   propertyPrice: number;
-  status: "pending" | "viewed" | "accepted" | "rejected";
+  status: "pending" | "viewed" | "accepted" | "rejected" | "cancelled" | "waiting_payment";
   createdAt: string;
   message?: string;
+  isHidden?: boolean; // Флаг скрытого заказа (для отменённых заказов старше TTL)
+  unpaidNotifiedAt?: string; // Дата отправки уведомления о неоплате (чтобы не спамить)
+  telegramUserId?: number; // Telegram user ID для отправки уведомлений через бота
+  botId?: number; // ID бота для отправки уведомлений
 }
 
 interface AuthContextType {
@@ -44,6 +48,7 @@ interface AuthContextType {
   clearViewHistory: () => void;
   applications: Application[];
   addApplication: (application: Omit<Application, "id" | "status" | "createdAt">) => void;
+  updateApplicationStatus: (applicationId: string, status: Application["status"]) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -58,6 +63,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [viewHistory, setViewHistory] = useState<ViewedProperty[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
+
+  // Функция для очистки отмененных заказов по TTL (вызывается извне при загрузке настроек)
+  const cleanupCancelledOrders = (ttlDays: number = 7, action: 'hide' | 'delete' = 'hide') => {
+    setApplications(prev => {
+      const now = new Date();
+      const updated = prev.map(app => {
+        // Проверяем только отмененные заказы
+        if (app.status !== 'cancelled' || app.isHidden) {
+          return app;
+        }
+
+        const createdAt = new Date(app.createdAt);
+        const daysDiff = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+
+        // Если заказ старше TTL
+        if (daysDiff >= ttlDays) {
+          if (action === 'delete') {
+            return null; // Удаляем
+          } else {
+            return { ...app, isHidden: true }; // Скрываем
+          }
+        }
+
+        return app;
+      }).filter((app): app is Application => app !== null);
+
+      localStorage.setItem(APPLICATIONS_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  };
 
   // Fetch user profile from database
   const fetchProfile = async (userId: string) => {
@@ -136,7 +171,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const savedApplications = localStorage.getItem(APPLICATIONS_KEY);
     if (savedApplications) {
-      setApplications(JSON.parse(savedApplications));
+      const parsed = JSON.parse(savedApplications);
+      
+      // При загрузке проверяем и очищаем отменённые заказы по TTL
+      // Используем настройки по умолчанию (7 дней, hide)
+      // В реальном приложении эти настройки должны загружаться из API/настроек бота
+      const now = new Date();
+      const ttlDays = 7; // По умолчанию 7 дней (можно получить из настроек через API)
+      const action: 'hide' | 'delete' = 'hide'; // По умолчанию скрывать (можно получить из настроек через API)
+      
+      const cleaned = parsed.map((app: Application) => {
+        if (app.status !== 'cancelled' || app.isHidden) {
+          return app;
+        }
+
+        const createdAt = new Date(app.createdAt);
+        const daysDiff = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (daysDiff >= ttlDays) {
+          if (action === 'delete') {
+            return null;
+          } else {
+            return { ...app, isHidden: true };
+          }
+        }
+
+        return app;
+      }).filter((app: Application | null): app is Application => app !== null);
+
+      // Сохраняем очищенные данные
+      localStorage.setItem(APPLICATIONS_KEY, JSON.stringify(cleaned));
+      setApplications(cleaned);
     }
 
     return () => subscription.unsubscribe();
@@ -264,6 +329,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  const updateApplicationStatus = (applicationId: string, status: Application["status"]) => {
+    setApplications(prev => {
+      const updated = prev.map(app => 
+        app.id === applicationId ? { ...app, status } : app
+      );
+      localStorage.setItem(APPLICATIONS_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  // Фильтруем скрытые заказы при возврате (не показываем скрытые в UI)
+  const visibleApplications = applications.filter(app => !app.isHidden);
+
   return (
     <AuthContext.Provider
       value={{
@@ -277,8 +355,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         viewHistory,
         addToViewHistory,
         clearViewHistory,
-        applications,
+        applications: visibleApplications, // Возвращаем только видимые заказы
         addApplication,
+        updateApplicationStatus,
       }}
     >
       {children}

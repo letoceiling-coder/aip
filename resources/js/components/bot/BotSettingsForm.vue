@@ -571,6 +571,73 @@
                         class="w-full h-10 px-3 border border-border rounded-lg bg-background"
                     />
                 </div>
+
+                <!-- Настройки отмененных заказов -->
+                <div class="border-t border-border pt-4 mt-4">
+                    <h4 class="text-md font-semibold mb-4">Настройки отменённых заказов</h4>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">Срок хранения отменённых заказов (дней)</label>
+                        <input
+                            v-model.number="form.other_settings.canceledOrdersTtlDays"
+                            type="number"
+                            min="1"
+                            max="365"
+                            class="w-full h-10 px-3 border border-border rounded-lg bg-background"
+                        />
+                        <p class="text-xs text-muted-foreground mt-1">
+                            Через указанное количество дней отменённые заказы будут скрыты или удалены
+                        </p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Действие после истечения срока</label>
+                        <select
+                            v-model="form.other_settings.canceledOrdersAfterTtlAction"
+                            class="w-full h-10 px-3 border border-border rounded-lg bg-background"
+                        >
+                            <option value="hide">Скрыть от пользователя</option>
+                            <option value="delete">Удалить безвозвратно</option>
+                        </select>
+                        <p class="text-xs text-muted-foreground mt-1">
+                            При "Скрыть" заказы останутся в системе, но не будут видны пользователю. 
+                            При "Удалить" заказы будут безвозвратно удалены.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Настройки уведомлений о неоплаченных заказах -->
+                <div class="border-t border-border pt-4 mt-4">
+                    <h4 class="text-md font-semibold mb-4">Уведомления о неоплаченных заказах</h4>
+                    
+                    <div class="mb-4">
+                        <label class="flex items-center gap-2">
+                            <input
+                                v-model="form.other_settings.unpaidNotificationsEnabled"
+                                type="checkbox"
+                                class="w-4 h-4"
+                            />
+                            <span>Включить уведомления о неоплаченных заказах</span>
+                        </label>
+                        <p class="text-xs text-muted-foreground mt-1 ml-6">
+                            Бот будет отправлять уведомления пользователям, если заказ в статусе "Ожидает оплаты" не оплачен
+                        </p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Отправлять уведомление через (минут)</label>
+                        <input
+                            v-model.number="form.other_settings.unpaidNotifyAfterMinutes"
+                            type="number"
+                            min="1"
+                            max="1440"
+                            class="w-full h-10 px-3 border border-border rounded-lg bg-background"
+                        />
+                        <p class="text-xs text-muted-foreground mt-1">
+                            Через сколько минут после создания заказа отправлять уведомление о необходимости оплаты
+                        </p>
+                    </div>
+                </div>
             </div>
 
             <!-- Actions -->
@@ -709,6 +776,10 @@ export default {
                 phone_validation_strict: false,
                 max_description_length: 1000,
                 subscription_check_timeout: 5,
+                canceledOrdersTtlDays: 7,
+                canceledOrdersAfterTtlAction: 'hide',
+                unpaidNotificationsEnabled: true,
+                unpaidNotifyAfterMinutes: 30,
             },
         })
         
@@ -795,6 +866,10 @@ export default {
                             phone_validation_strict: false,
                             max_description_length: 1000,
                             subscription_check_timeout: 5,
+                            canceledOrdersTtlDays: 7,
+                            canceledOrdersAfterTtlAction: 'hide',
+                            unpaidNotificationsEnabled: true,
+                            unpaidNotifyAfterMinutes: 30,
                         },
                     }
                 }

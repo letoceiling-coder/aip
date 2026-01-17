@@ -498,3 +498,4 @@ $description = strip_tags($description); // Удаление HTML тегов
 
 
 
+

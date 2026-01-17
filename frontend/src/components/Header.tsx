@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Heart, User, Menu, MapPin, ChevronDown, Search, Building2 } from "lucide-react";
+import { Heart, User, Menu, MapPin, ChevronDown, Search, Building2, MessageCircle, HelpCircle } from "lucide-react";
 import { Button } from "./ui/button";
 import LiveGridLogo from "./LiveGridLogo";
 import AuthModal from "./AuthModal";
@@ -11,9 +11,11 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
+import { toast } from "sonner";
 
 const Header = () => {
   const location = useLocation();
@@ -34,6 +36,22 @@ const Header = () => {
   const [scrollY, setScrollY] = useState(0);
 
   const favoritesCount = favorites.length;
+
+  // Handle Support button click - открывает Telegram чат поддержки
+  const handleSupportClick = () => {
+    try {
+      const supportUrl = "https://t.me/livegrid";
+      const newWindow = window.open(supportUrl, "_blank", "noopener,noreferrer");
+      
+      if (!newWindow || newWindow.closed || typeof newWindow.closed === "undefined") {
+        // Браузер заблокировал открытие окна
+        toast.error("Не удалось открыть чат поддержки. Пожалуйста, откройте ссылку вручную: https://t.me/livegrid");
+      }
+    } catch (error) {
+      console.error("Error opening support chat:", error);
+      toast.error("Произошла ошибка при открытии чата поддержки. Пожалуйста, попробуйте позже или откройте ссылку вручную: https://t.me/livegrid");
+    }
+  };
 
   // Handle scroll for animations
   useEffect(() => {
@@ -152,17 +170,31 @@ const Header = () => {
                 </Button>
               </Link>
 
-              {/* Login Button */}
+              {/* Login Button / Profile Dropdown */}
               {isAuthenticated ? (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => navigate("/profile")}
-                  className="gap-2"
-                >
-                  <User className="w-4 h-4" />
-                  <span className="hidden sm:inline">{user?.name || "Профиль"}</span>
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="gap-2"
+                    >
+                      <User className="w-4 h-4" />
+                      <span className="hidden sm:inline">{user?.name || "Профиль"}</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-[200px]">
+                    <DropdownMenuItem onClick={() => navigate("/profile")}>
+                      <User className="w-4 h-4 mr-2" />
+                      Профиль
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleSupportClick}>
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                      Поддержка
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               ) : (
                 <Button variant="primary" size="sm" onClick={() => setAuthModalOpen(true)}>
                   Войти
@@ -223,7 +255,27 @@ const Header = () => {
                       </Link>
                     </div>
 
-                    <div className="border-t pt-4 mt-4">
+                    <div className="border-t pt-4 mt-4 space-y-2">
+                      {isAuthenticated && (
+                        <Link
+                          to="/profile"
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-accent"
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          <User className="w-4 h-4" />
+                          Профиль
+                        </Link>
+                      )}
+                      <button
+                        onClick={() => {
+                          handleSupportClick();
+                          setMobileMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-accent text-left"
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                        Поддержка
+                      </button>
                       <Link
                         to="/favorites"
                         className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-accent"

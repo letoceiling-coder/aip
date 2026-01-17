@@ -22,7 +22,8 @@ import { cn } from "@/lib/utils";
 import { 
   User, Heart, Clock, FileText, Settings, LogOut, 
   ChevronRight, Trash2, Mail, Phone, Camera, Bookmark,
-  Bell, Shield, AlertTriangle, ExternalLink, Search
+  Bell, Shield, AlertTriangle, ExternalLink, Search,
+  Loader2, X
 } from "lucide-react";
 
 interface SavedSearch {
@@ -42,7 +43,7 @@ interface NotificationSettings {
 
 const Profile = () => {
   const navigate = useNavigate();
-  const { user, isAuthenticated, logout, updateProfile, viewHistory, clearViewHistory, applications } = useAuth();
+  const { user, isAuthenticated, logout, updateProfile, viewHistory, clearViewHistory, applications, updateApplicationStatus } = useAuth();
   const { favorites, clearFavorites } = useFavorites();
   
   const [activeTab, setActiveTab] = useState("profile");
@@ -52,6 +53,7 @@ const Profile = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
   
   // Saved searches (mock data + localStorage)
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
@@ -161,7 +163,43 @@ const Profile = () => {
       case "viewed": return { label: "Просмотрено", color: "bg-primary/10 text-primary" };
       case "accepted": return { label: "Принята", color: "bg-green-100 text-green-700" };
       case "rejected": return { label: "Отклонена", color: "bg-destructive/10 text-destructive" };
+      case "cancelled": return { label: "Отменена", color: "bg-gray-100 text-gray-700" };
       default: return { label: status, color: "bg-muted text-muted-foreground" };
+    }
+  };
+
+  const handleCancelOrder = async (applicationId: string) => {
+    // Сразу устанавливаем loading state
+    setCancellingOrderId(applicationId);
+
+    try {
+      // Симуляция API запроса (замените на реальный API вызов)
+      await new Promise((resolve, reject) => {
+        // Случайная проверка на ошибку для демонстрации обработки ошибок
+        const shouldFail = Math.random() < 0.1; // 10% вероятность ошибки
+        
+        setTimeout(() => {
+          if (shouldFail) {
+            reject(new Error("Ошибка соединения с сервером"));
+          } else {
+            resolve({ success: true });
+          }
+        }, 1000);
+      });
+
+      // Обновляем статус заказа в UI
+      updateApplicationStatus(applicationId, "cancelled");
+      toast.success("Заказ успешно отменён");
+    } catch (error) {
+      // Обработка ошибки - показываем понятное сообщение
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : "Не удалось отменить заказ. Пожалуйста, попробуйте позже.";
+      
+      toast.error(errorMessage);
+    } finally {
+      // Возвращаем кнопку в активное состояние
+      setCancellingOrderId(null);
     }
   };
 
@@ -580,6 +618,9 @@ const Profile = () => {
                   <div className="space-y-3">
                     {applications.map((app) => {
                       const status = getStatusLabel(app.status);
+                      const isCancelling = cancellingOrderId === app.id;
+                      const canCancel = app.status === "pending";
+                      
                       return (
                         <div 
                           key={app.id}
@@ -598,9 +639,32 @@ const Profile = () => {
                               Заявка от {formatDate(app.createdAt)}
                             </p>
                           </div>
-                          <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${status.color}`}>
-                            {status.label}
-                          </span>
+                          <div className="flex items-center gap-3">
+                            <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${status.color}`}>
+                              {status.label}
+                            </span>
+                            {canCancel && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleCancelOrder(app.id)}
+                                disabled={isCancelling}
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              >
+                                {isCancelling ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Отмена...
+                                  </>
+                                ) : (
+                                  <>
+                                    <X className="w-4 h-4 mr-2" />
+                                    Отменить
+                                  </>
+                                )}
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       );
                     })}

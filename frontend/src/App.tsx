@@ -16,6 +16,8 @@ import Developers from "./pages/Developers";
 import ResidentialComplex from "./pages/ResidentialComplex";
 import ComplexDetail from "./pages/ComplexDetail";
 import Compare from "./pages/Compare";
+import Cart from "./pages/Cart";
+import OrderCheckout from "./pages/OrderCheckout";
 import Auth from "./pages/Auth";
 import Profile from "./pages/Profile";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
@@ -56,6 +58,8 @@ const App = () => (
                 <Route path="/complex/:id" element={<ComplexDetail />} />
                 <Route path="/buildings/:id" element={<ComplexDetail />} />
                 <Route path="/compare" element={<Compare />} />
+                <Route path="/cart" element={<Cart />} />
+                <Route path="/order-checkout" element={<OrderCheckout />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/privacy" element={<PrivacyPolicy />} />

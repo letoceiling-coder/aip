@@ -201,6 +201,10 @@ class UpdateBotSettingsRequest extends FormRequest
             'settings.other_settings.phone_validation_strict' => ['nullable', 'boolean'],
             'settings.other_settings.max_description_length' => ['nullable', 'integer', 'min:10', 'max:5000'],
             'settings.other_settings.subscription_check_timeout' => ['nullable', 'integer', 'min:1', 'max:30'],
+            'settings.other_settings.canceledOrdersTtlDays' => ['nullable', 'integer', 'min:1', 'max:365'],
+            'settings.other_settings.canceledOrdersAfterTtlAction' => ['nullable', 'string', 'in:hide,delete'],
+            'settings.other_settings.unpaidNotificationsEnabled' => ['nullable', 'boolean'],
+            'settings.other_settings.unpaidNotifyAfterMinutes' => ['nullable', 'integer', 'min:1', 'max:1440'],
         ];
     }
 

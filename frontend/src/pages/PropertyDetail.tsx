@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import {
   Heart, Phone, MapPin, Maximize2, Home, Calendar, 
   ChevronLeft, ChevronRight, CreditCard, Building2, 
   Car, Shield, Trees, Share2, Check, Copy, MessageCircle,
-  Ruler, DoorOpen, Bath, Sparkles, X
+  Ruler, DoorOpen, Bath, Sparkles, X, ArrowLeft, ShoppingCart
 } from "lucide-react";
 import PropertyCard from "@/components/PropertyCard";
 import ViewingRequestForm from "@/components/ViewingRequestForm";
@@ -106,6 +106,8 @@ const similarProperties = [
 
 const PropertyDetail = () => {
   const { id } = useParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showAllPhotos, setShowAllPhotos] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
@@ -115,6 +117,9 @@ const PropertyDetail = () => {
   const touchEndX = useRef<number>(0);
   
   const favorite = isFavorite(mockProperty.id);
+  
+  // Проверяем, пришли ли мы из корзины
+  const fromCart = location.search.includes("from=cart") || location.state?.fromCart;
 
   const formatPrice = (price: number) => {
     return price.toLocaleString("ru-RU") + " ₽";
@@ -200,6 +205,20 @@ const PropertyDetail = () => {
       <Header />
 
       <main className="container mx-auto px-4 py-6 md:py-8 pb-24 lg:pb-8">
+        {/* Back to Cart Button */}
+        {fromCart && (
+          <div className="mb-4">
+            <Button
+              variant="ghost"
+              onClick={() => navigate("/cart")}
+              className="gap-2 text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Назад в корзину
+            </Button>
+          </div>
+        )}
+        
         {/* Breadcrumbs */}
         <Breadcrumb className="mb-6">
           <BreadcrumbList>
